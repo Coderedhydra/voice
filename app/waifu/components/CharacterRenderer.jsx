@@ -4,11 +4,18 @@ import React, { useRef, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import * as THREE from 'three';
 
-// Dynamically import Canvas to avoid SSR issues
-const Canvas = dynamic(() => import('@react-three/fiber').then(mod => mod.Canvas), { 
-  ssr: false,
-  loading: () => <div className="w-full h-full flex items-center justify-center text-white">Loading 3D renderer...</div>
-});
+// Dynamically import Canvas to avoid SSR issues - must not render on server
+const Canvas = dynamic(
+  () => import('@react-three/fiber').then(mod => mod.Canvas), 
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex items-center justify-center text-white">
+        <div>Loading 3D renderer...</div>
+      </div>
+    )
+  }
+);
 
 // Animation states mapping
 const animationStates = {
@@ -205,8 +212,13 @@ function Character({ animation, expression, intensity }) {
   );
 }
 
-// Scene component that uses drei components
+// Scene component that uses drei components - only runs client-side
 function Scene({ animation, expression, intensity }) {
+  // Only require drei on client side
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
   const { OrbitControls, PerspectiveCamera, Environment } = require('@react-three/drei');
   
   return (
@@ -241,8 +253,18 @@ function Scene({ animation, expression, intensity }) {
 
 // Main renderer component
 export function CharacterRenderer({ animation, expression, intensity }) {
-  if (typeof window === 'undefined') {
-    return <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900" />;
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900 flex items-center justify-center">
+        <div className="text-white text-lg">Loading 3D renderer...</div>
+      </div>
+    );
   }
 
   return (

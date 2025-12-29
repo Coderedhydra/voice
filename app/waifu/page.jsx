@@ -23,10 +23,13 @@ export default function WaifuPage() {
   // Handle incoming WebSocket messages
   useEffect(() => {
     if (lastMessage) {
+      console.log('Received WebSocket message:', lastMessage);
       if (lastMessage.animation) {
+        console.log('Setting animation:', lastMessage.animation);
         setCurrentAnimation(lastMessage.animation);
       }
       if (lastMessage.chat) {
+        console.log('Adding chat message:', lastMessage.chat);
         setMessages((prev) => [
           ...prev,
           { type: 'assistant', content: lastMessage.chat, timestamp: Date.now() },
@@ -37,15 +40,22 @@ export default function WaifuPage() {
 
   const handleSend = (e) => {
     e.preventDefault();
-    if (!input.trim() || !isConnected) return;
+    if (!input.trim() || !isConnected) {
+      if (!isConnected) {
+        alert('Not connected to server. Please wait for connection.');
+      }
+      return;
+    }
 
     const userMessage = { type: 'user', content: input, timestamp: Date.now() };
     setMessages((prev) => [...prev, userMessage]);
     
-    if (sendMessage(input)) {
-      setInput('');
-    } else {
+    const messageToSend = input.trim();
+    setInput(''); // Clear input immediately for better UX
+    
+    if (!sendMessage(messageToSend)) {
       alert('Failed to send message. Please check connection.');
+      setInput(messageToSend); // Restore input if send failed
     }
   };
 

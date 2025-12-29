@@ -88,18 +88,26 @@ def query_ollama(user_message: str, history: list) -> str:
     full_prompt += f"User: {user_message}\nYuki:"
     
     try:
-        # Run Ollama with the prompt
-        result = subprocess.run(
-            ["ollama", "run", OLLAMA_MODEL, full_prompt],
-            capture_output=True,
+        # Run Ollama with the prompt - use stdin for better compatibility
+        process = subprocess.Popen(
+            ["ollama", "run", OLLAMA_MODEL],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=120  # 2 minute timeout for slow models
+            bufsize=0
         )
         
-        if result.returncode == 0:
-            return result.stdout.strip()
+        stdout, stderr = process.communicate(input=full_prompt, timeout=120)
+        
+        if process.returncode == 0 and stdout:
+            response = stdout.strip()
+            # Remove any prompt echo from the response
+            if "Yuki:" in response:
+                response = response.split("Yuki:")[-1].strip()
+            return response if response else generate_fallback_response()
         else:
-            print(f"Ollama error: {result.stderr}")
+            print(f"Ollama error: {stderr}")
             return generate_fallback_response()
             
     except subprocess.TimeoutExpired:
@@ -107,6 +115,8 @@ def query_ollama(user_message: str, history: list) -> str:
         return generate_fallback_response()
     except Exception as e:
         print(f"Ollama query failed: {e}")
+        import traceback
+        traceback.print_exc()
         return generate_fallback_response()
 
 
@@ -265,13 +275,15 @@ async def handle_client(websocket, path):
             if not user_input:
                 continue
             
-            print(f"[?] Querying Ollama: {user_input[:50]}...")
+            print(f"[?] Querying Ollama with model '{OLLAMA_MODEL}': {user_input[:50]}...")
             
             # Query Ollama
             response = query_ollama(user_input, conversation_history)
+            print(f"[+] Ollama response received: {response[:100]}...")
             
             # Process response
             animation, chat_text = process_response(response)
+            print(f"[+] Processed - Animation: {animation['body']}/{animation['face']}, Chat: {chat_text[:50]}...")
             
             # Store in history
             conversation_history.append({

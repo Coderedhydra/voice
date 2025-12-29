@@ -14,7 +14,7 @@ const animationStates = {
   shy_cover: { position: [0, 0.1, -0.2], rotation: [0, -0.3, 0], scale: 0.95 },
 };
 
-// Facial expression colors/materials - simplified
+// Facial expression colors/materials
 const expressionMaterials = {
   smile_seductive: { color: '#ffb3d9', emissive: '#ff66b3' },
   blush_light: { color: '#ffcccc', emissive: '#ff9999' },
@@ -24,7 +24,7 @@ const expressionMaterials = {
   look_away: { color: '#ffb3d9', emissive: '#ff99cc' },
 };
 
-// Character component - optimized for performance
+// Character component
 function Character({ animation, expression, intensity }) {
   const groupRef = useRef();
   const bodyRef = useRef();
@@ -33,66 +33,47 @@ function Character({ animation, expression, intensity }) {
   const [currentExpression, setCurrentExpression] = useState('smile_seductive');
   const [targetState, setTargetState] = useState(null);
   const timeRef = useRef(0);
-  const frameCountRef = useRef(0);
 
   // Import useFrame hook
   const { useFrame } = require('@react-three/fiber');
 
   // Update animation when props change
   useEffect(() => {
-    if (animation && expression) {
+    if (animation) {
       setTargetState({
-        animation,
-        expression,
-        intensity: intensity || 0.5,
+        animation: animation.body || 'idle_soft',
+        expression: animation.face || expression || 'smile_seductive',
+        intensity: animation.intensity || intensity || 0.5,
         timestamp: Date.now(),
       });
     }
   }, [animation, expression, intensity]);
 
-  // Optimized animation - update every 2 frames for better performance
+  // Animation loop - simplified for better performance
   useFrame((state, delta) => {
-    frameCountRef.current++;
-    // Skip frames for better performance
-    if (frameCountRef.current % 2 !== 0) return;
-    
-    timeRef.current += delta * 2; // Compensate for skipped frames
+    timeRef.current += delta;
 
     if (targetState) {
       const animState = animationStates[targetState.animation] || animationStates.idle_soft;
       const exprMat = expressionMaterials[targetState.expression] || expressionMaterials.smile_seductive;
       
-      // Smooth interpolation with faster lerp
+      // Smooth interpolation
       if (groupRef.current) {
         const targetPos = animState.position;
         const targetRot = animState.rotation;
         const targetScale = animState.scale * (0.9 + targetState.intensity * 0.2);
 
-        groupRef.current.position.lerp(
-          new THREE.Vector3(...targetPos),
-          0.2 // Faster interpolation
-        );
-        groupRef.current.rotation.x = THREE.MathUtils.lerp(
-          groupRef.current.rotation.x,
-          targetRot[0],
-          0.2
-        );
-        groupRef.current.rotation.y = THREE.MathUtils.lerp(
-          groupRef.current.rotation.y,
-          targetRot[1],
-          0.2
-        );
-        groupRef.current.scale.lerp(
-          new THREE.Vector3(targetScale, targetScale, targetScale),
-          0.2
-        );
+        groupRef.current.position.lerp(new THREE.Vector3(...targetPos), 0.15);
+        groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRot[0], 0.15);
+        groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRot[1], 0.15);
+        groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
       }
 
-      // Update expression material less frequently
-      if (faceRef.current && frameCountRef.current % 4 === 0) {
+      // Update expression material
+      if (faceRef.current) {
         const mat = faceRef.current.material;
-        mat.color.lerp(new THREE.Color(exprMat.color), 0.2);
-        mat.emissive.lerp(new THREE.Color(exprMat.emissive), 0.2);
+        mat.color.lerp(new THREE.Color(exprMat.color), 0.15);
+        mat.emissive.lerp(new THREE.Color(exprMat.emissive), 0.15);
         mat.emissiveIntensity = 0.3 + targetState.intensity * 0.7;
       }
 
@@ -100,7 +81,7 @@ function Character({ animation, expression, intensity }) {
       setCurrentExpression(targetState.expression);
     }
 
-    // Breathing animation - simplified
+    // Breathing animation
     if (currentAnimation === 'idle_soft' || currentAnimation === 'slow_breathing') {
       const breathSpeed = currentAnimation === 'slow_breathing' ? 0.8 : 1.5;
       const breathAmount = currentAnimation === 'slow_breathing' ? 0.15 : 0.08;
@@ -109,7 +90,7 @@ function Character({ animation, expression, intensity }) {
       }
     }
 
-    // Sway animation - simplified
+    // Sway animation
     if (currentAnimation === 'sway_hips') {
       if (groupRef.current) {
         groupRef.current.rotation.z = Math.sin(timeRef.current * 1.2) * 0.1;
@@ -118,24 +99,23 @@ function Character({ animation, expression, intensity }) {
     }
   });
 
-  // Simplified geometry - fewer segments for better performance
   return (
     <group ref={groupRef}>
-      {/* Body - reduced segments */}
+      {/* Body */}
       <mesh ref={bodyRef} position={[0, 0, 0]}>
-        <capsuleGeometry args={[0.3, 1.2, 4, 8]} />
+        <capsuleGeometry args={[0.3, 1.2, 6, 12]} />
         <meshStandardMaterial
           color="#ffb3d9"
-          roughness={0.5}
+          roughness={0.4}
           metalness={0.1}
           emissive="#ff99cc"
           emissiveIntensity={0.2}
         />
       </mesh>
 
-      {/* Head - reduced segments */}
+      {/* Head */}
       <mesh position={[0, 0.8, 0]}>
-        <sphereGeometry args={[0.25, 16, 16]} />
+        <sphereGeometry args={[0.25, 20, 20]} />
         <meshStandardMaterial
           color="#ffe6f2"
           roughness={0.3}
@@ -155,9 +135,9 @@ function Character({ animation, expression, intensity }) {
         />
       </mesh>
 
-      {/* Hair - simplified */}
+      {/* Hair */}
       <mesh position={[0, 1.0, -0.1]}>
-        <capsuleGeometry args={[0.28, 0.4, 4, 8]} />
+        <capsuleGeometry args={[0.28, 0.4, 6, 12]} />
         <meshStandardMaterial
           color="#ff66b3"
           roughness={0.5}
@@ -165,9 +145,9 @@ function Character({ animation, expression, intensity }) {
         />
       </mesh>
 
-      {/* Arms - simplified */}
+      {/* Arms */}
       <mesh position={[-0.4, 0.2, 0]} rotation={[0, 0, 0.3]}>
-        <capsuleGeometry args={[0.08, 0.5, 4, 8]} />
+        <capsuleGeometry args={[0.08, 0.5, 6, 12]} />
         <meshStandardMaterial
           color="#ffe6f2"
           roughness={0.4}
@@ -175,7 +155,7 @@ function Character({ animation, expression, intensity }) {
         />
       </mesh>
       <mesh position={[0.4, 0.2, 0]} rotation={[0, 0, -0.3]}>
-        <capsuleGeometry args={[0.08, 0.5, 4, 8]} />
+        <capsuleGeometry args={[0.08, 0.5, 6, 12]} />
         <meshStandardMaterial
           color="#ffe6f2"
           roughness={0.4}
@@ -183,9 +163,9 @@ function Character({ animation, expression, intensity }) {
         />
       </mesh>
 
-      {/* Legs - simplified */}
+      {/* Legs */}
       <mesh position={[-0.15, -0.7, 0]}>
-        <capsuleGeometry args={[0.1, 0.6, 4, 8]} />
+        <capsuleGeometry args={[0.1, 0.6, 6, 12]} />
         <meshStandardMaterial
           color="#ffb3d9"
           roughness={0.4}
@@ -193,7 +173,7 @@ function Character({ animation, expression, intensity }) {
         />
       </mesh>
       <mesh position={[0.15, -0.7, 0]}>
-        <capsuleGeometry args={[0.1, 0.6, 4, 8]} />
+        <capsuleGeometry args={[0.1, 0.6, 6, 12]} />
         <meshStandardMaterial
           color="#ffb3d9"
           roughness={0.4}
@@ -204,7 +184,7 @@ function Character({ animation, expression, intensity }) {
   );
 }
 
-// Scene component - optimized lighting
+// Scene component
 function Scene({ animation, expression, intensity }) {
   const [dreiLoaded, setDreiLoaded] = useState(false);
   const [dreiComponents, setDreiComponents] = useState(null);
@@ -220,50 +200,38 @@ function Scene({ animation, expression, intensity }) {
         setDreiLoaded(true);
       }).catch((err) => {
         console.error('Failed to load drei components:', err);
+        setDreiLoaded(true); // Still render without drei
       });
     }
   }, []);
 
-  // Simplified lighting for better performance
-  if (!dreiLoaded || !dreiComponents) {
-    return (
-      <>
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[5, 5, 5]} intensity={0.6} />
-        <Character
-          animation={animation?.body || 'idle_soft'}
-          expression={expression || animation?.face || 'smile_seductive'}
-          intensity={intensity || animation?.intensity || 0.5}
-        />
-      </>
-    );
-  }
-
-  const { OrbitControls, PerspectiveCamera, Environment } = dreiComponents;
-
   return (
     <>
-      <PerspectiveCamera makeDefault position={[0, 0.5, 3]} fov={50} />
-      <OrbitControls
-        enablePan={false}
-        minDistance={2}
-        maxDistance={5}
-        minPolarAngle={Math.PI / 6}
-        maxPolarAngle={Math.PI / 2.2}
-        enableDamping={true}
-        dampingFactor={0.05}
-      />
+      {dreiLoaded && dreiComponents ? (
+        <>
+          <dreiComponents.PerspectiveCamera makeDefault position={[0, 0.5, 3]} fov={50} />
+          <dreiComponents.OrbitControls
+            enablePan={false}
+            minDistance={2}
+            maxDistance={5}
+            minPolarAngle={Math.PI / 6}
+            maxPolarAngle={Math.PI / 2.2}
+            enableDamping={true}
+            dampingFactor={0.05}
+          />
+          <dreiComponents.Environment preset="sunset" />
+        </>
+      ) : (
+        <perspectiveCamera position={[0, 0.5, 3]} fov={50} />
+      )}
       
-      {/* Simplified lighting */}
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[5, 5, 5]} intensity={0.7} />
-      <pointLight position={[-3, 2, -3]} intensity={0.3} color="#ffb3d9" />
-      <pointLight position={[3, 2, -3]} intensity={0.3} color="#ff99cc" />
+      {/* Lighting */}
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[5, 5, 5]} intensity={0.8} />
+      <pointLight position={[-3, 2, -3]} intensity={0.4} color="#ffb3d9" />
+      <pointLight position={[3, 2, -3]} intensity={0.4} color="#ff99cc" />
       
-      {/* Environment - lower quality for performance */}
-      <Environment preset="sunset" />
-      
-      {/* Character */}
+      {/* Character - always render */}
       <Character
         animation={animation?.body || 'idle_soft'}
         expression={expression || animation?.face || 'smile_seductive'}
@@ -273,21 +241,24 @@ function Scene({ animation, expression, intensity }) {
   );
 }
 
-// Canvas wrapper component - optimized
+// Canvas wrapper component
 function CanvasWrapper({ animation, expression, intensity }) {
   const [CanvasComponent, setCanvasComponent] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       import('@react-three/fiber').then((mod) => {
         setCanvasComponent(() => mod.Canvas);
+        setLoading(false);
       }).catch((err) => {
         console.error('Failed to load Canvas:', err);
+        setLoading(false);
       });
     }
   }, []);
 
-  if (!CanvasComponent) {
+  if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center text-white">
         <div>Loading 3D renderer...</div>
@@ -295,12 +266,18 @@ function CanvasWrapper({ animation, expression, intensity }) {
     );
   }
 
+  if (!CanvasComponent) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-white">
+        <div>Failed to load 3D renderer</div>
+      </div>
+    );
+  }
+
   return (
     <CanvasComponent 
-      shadows={false}
-      gl={{ antialias: false, powerPreference: "high-performance" }}
-      dpr={[1, 1.5]}
-      performance={{ min: 0.5 }}
+      gl={{ antialias: true, powerPreference: "high-performance" }}
+      dpr={[1, 2]}
     >
       <Suspense fallback={null}>
         <Scene 

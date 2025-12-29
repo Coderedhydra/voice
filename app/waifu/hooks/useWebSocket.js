@@ -38,12 +38,27 @@ export function useWebSocket(url) {
 
       ws.onerror = (err) => {
         console.error('WebSocket error:', err);
-        setError('Connection error');
+        console.error('WebSocket URL:', url);
+        console.error('WebSocket readyState:', ws.readyState);
+        setError(`Connection error: ${err.message || 'Failed to connect'}`);
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected', {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean
+        });
         setIsConnected(false);
+        
+        // Provide helpful error messages
+        if (event.code === 1006) {
+          setError('Connection refused. Is the Python server running on port 8765?');
+        } else if (event.code === 1002) {
+          setError('Protocol error. Check server configuration.');
+        } else if (event.reason) {
+          setError(`Connection closed: ${event.reason}`);
+        }
         
         // Attempt to reconnect
         if (reconnectAttempts.current < maxReconnectAttempts) {
@@ -54,7 +69,9 @@ export function useWebSocket(url) {
             connect();
           }, delay);
         } else {
-          setError('Failed to connect after multiple attempts');
+          if (!error) {
+            setError('Failed to connect after multiple attempts. Make sure the Python server is running.');
+          }
         }
       };
     } catch (err) {

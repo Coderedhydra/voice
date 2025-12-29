@@ -105,11 +105,25 @@ export default function WaifuPage() {
           />
           {!isConnected && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10">
-              <div className="text-center text-white">
+              <div className="text-center text-white max-w-md px-4">
                 <div className="text-4xl mb-4">⚠️</div>
-                <div className="text-xl mb-2">Not Connected</div>
-                <div className="text-sm text-gray-300">
-                  Make sure the Python server is running on port 8765
+                <div className="text-xl mb-2 font-bold">Not Connected to WebSocket Server</div>
+                <div className="text-sm text-gray-300 mb-4 space-y-2">
+                  <p>Make sure the Python WebSocket server is running:</p>
+                  <div className="bg-black/50 p-3 rounded text-left font-mono text-xs">
+                    <div>cd local-waifu-live/wsl</div>
+                    <div>source venv/bin/activate</div>
+                    <div>export OLLAMA_MODEL=qwen3:4b</div>
+                    <div>python server.py</div>
+                  </div>
+                  {error && (
+                    <p className="text-red-300 mt-2">Error: {error}</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-4">
+                    Note: You're accessing this page correctly at http://localhost:3000/waifu
+                    <br />
+                    The WebSocket connection (ws://localhost:8765) is made automatically by JavaScript.
+                  </p>
                 </div>
                 <button
                   onClick={reconnect}

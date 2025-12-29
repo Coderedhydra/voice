@@ -4,7 +4,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import * as THREE from 'three';
 
-// Dynamically import Canvas to avoid SSR issues - must not render on server
+// Dynamically import Canvas and drei components to avoid SSR issues
 const Canvas = dynamic(
   () => import('@react-three/fiber').then(mod => mod.Canvas), 
   { 
@@ -15,6 +15,22 @@ const Canvas = dynamic(
       </div>
     )
   }
+);
+
+// Dynamically import drei components
+const OrbitControls = dynamic(
+  () => import('@react-three/drei').then(mod => mod.OrbitControls),
+  { ssr: false }
+);
+
+const PerspectiveCamera = dynamic(
+  () => import('@react-three/drei').then(mod => mod.PerspectiveCamera),
+  { ssr: false }
+);
+
+const Environment = dynamic(
+  () => import('@react-three/drei').then(mod => mod.Environment),
+  { ssr: false }
 );
 
 // Animation states mapping
@@ -48,7 +64,7 @@ function Character({ animation, expression, intensity }) {
   const [targetState, setTargetState] = useState(null);
   const timeRef = useRef(0);
 
-  // Import useFrame dynamically inside component
+  // Import useFrame hook - must be done inside component that's inside Canvas
   const { useFrame } = require('@react-three/fiber');
 
   // Update animation when props change
@@ -63,7 +79,7 @@ function Character({ animation, expression, intensity }) {
     }
   }, [animation, expression, intensity]);
 
-  // Animate towards target state
+  // Animate towards target state - useFrame must be called unconditionally
   useFrame((state, delta) => {
     timeRef.current += delta;
 
@@ -212,15 +228,8 @@ function Character({ animation, expression, intensity }) {
   );
 }
 
-// Scene component that uses drei components - only runs client-side
+// Scene component - only renders client-side
 function Scene({ animation, expression, intensity }) {
-  // Only require drei on client side
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  
-  const { OrbitControls, PerspectiveCamera, Environment } = require('@react-three/drei');
-  
   return (
     <>
       <PerspectiveCamera makeDefault position={[0, 0.5, 3]} fov={50} />
@@ -253,9 +262,9 @@ function Scene({ animation, expression, intensity }) {
 
 // Main renderer component
 export function CharacterRenderer({ animation, expression, intensity }) {
-  const [mounted, setMounted] = React.useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setMounted(true);
   }, []);
 

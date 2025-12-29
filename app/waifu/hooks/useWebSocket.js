@@ -52,12 +52,13 @@ export function useWebSocket(url) {
         setIsConnected(false);
         
         // Provide helpful error messages
+        let errorMessage = null;
         if (event.code === 1006) {
-          setError('Connection refused. Is the Python server running on port 8765?');
+          errorMessage = 'Connection refused. Is the Python server running on port 8765?';
         } else if (event.code === 1002) {
-          setError('Protocol error. Check server configuration.');
+          errorMessage = 'Protocol error. Check server configuration.';
         } else if (event.reason) {
-          setError(`Connection closed: ${event.reason}`);
+          errorMessage = `Connection closed: ${event.reason}`;
         }
         
         // Attempt to reconnect
@@ -68,10 +69,11 @@ export function useWebSocket(url) {
             console.log(`Reconnecting... (attempt ${reconnectAttempts.current})`);
             connect();
           }, delay);
-        } else {
-          if (!error) {
-            setError('Failed to connect after multiple attempts. Make sure the Python server is running.');
+          if (errorMessage) {
+            setError(errorMessage);
           }
+        } else {
+          setError(errorMessage || 'Failed to connect after multiple attempts. Make sure the Python server is running.');
         }
       };
     } catch (err) {

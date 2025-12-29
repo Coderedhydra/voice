@@ -71,31 +71,67 @@ echo -e "${GREEN}[*] Starting Python WebSocket server...${NC}"
 cd local-waifu-live/wsl
 export OLLAMA_MODEL="$MODEL"
 
-# Start the server (run.sh will handle killing existing processes)
-./run.sh > /tmp/waifu-python.log 2>&1 &
+# Check if venv exists, if not set it up first
+if [ ! -d "venv" ]; then
+    echo -e "${YELLOW}[*] Virtual environment not found. Setting up...${NC}"
+    # Run setup synchronously first
+    ./run.sh > /tmp/waifu-setup.log 2>&1 &
+    SETUP_PID=$!
+    # Wait for setup to complete (but don't wait for server to start)
+    wait $SETUP_PID 2>/dev/null || true
+    echo -e "${GREEN}[✓] Setup complete${NC}"
+fi
+
+# Activate venv and start server directly
+source venv/bin/activate
+
+# Ensure Ollama is running
+if ! pgrep -x "ollama" > /dev/null; then
+    echo -e "${YELLOW}[*] Starting Ollama server...${NC}"
+    ollama serve > /dev/null 2>&1 &
+    sleep 2
+fi
+
+# Check model exists
+if ! ollama list 2>/dev/null | grep -q "$MODEL"; then
+    echo -e "${YELLOW}[!] Model '$MODEL' not found. Pulling...${NC}"
+    ollama pull "$MODEL" || echo -e "${RED}[!] Failed to pull model${NC}"
+fi
+
+# Start the server directly
+echo -e "${YELLOW}[*] Starting WebSocket server on port 8765...${NC}"
+python server.py > /tmp/waifu-python.log 2>&1 &
 PYTHON_PID=$!
 cd ../..
 
-# Wait a bit for server to start
-sleep 4
+# Wait for server to start and check multiple times
+echo -e "${YELLOW}[*] Waiting for Python server to start...${NC}"
+for i in {1..15}; do
+    sleep 1
+    if lsof -ti:8765 > /dev/null 2>&1; then
+        echo -e "${GREEN}[✓] Python WebSocket server running on port 8765 (PID: $PYTHON_PID)${NC}"
+        break
+    fi
+    # Check if process died
+    if ! kill -0 $PYTHON_PID 2>/dev/null; then
+        echo -e "${RED}[!] Python server process died${NC}"
+        echo -e "${RED}[!] Last 20 lines of log:${NC}"
+        echo -e "${RED}----------------------------------------${NC}"
+        tail -20 /tmp/waifu-python.log 2>/dev/null || echo "No log file found"
+        echo -e "${RED}----------------------------------------${NC}"
+        exit 1
+    fi
+    if [ $i -eq 15 ]; then
+        echo -e "${RED}[!] Python server failed to start on port 8765 after 15 seconds${NC}"
+        echo -e "${RED}[!] Last 30 lines of log:${NC}"
+        echo -e "${RED}----------------------------------------${NC}"
+        tail -30 /tmp/waifu-python.log 2>/dev/null || echo "No log file found"
+        echo -e "${RED}----------------------------------------${NC}"
+        kill $PYTHON_PID 2>/dev/null || true
+        exit 1
+    fi
+done
 
-# Check if Python server started successfully
-if ! kill -0 $PYTHON_PID 2>/dev/null; then
-    echo -e "${RED}[!] Python server failed to start${NC}"
-    echo -e "${RED}[!] Check logs: cat /tmp/waifu-python.log${NC}"
-    exit 1
-fi
-
-# Check if server is listening on port 8765
-sleep 2
-if ! lsof -ti:8765 > /dev/null 2>&1; then
-    echo -e "${RED}[!] Python server is not listening on port 8765${NC}"
-    echo -e "${RED}[!] Check logs: cat /tmp/waifu-python.log${NC}"
-    kill $PYTHON_PID 2>/dev/null || true
-    exit 1
-fi
-
-echo -e "${GREEN}[✓] Python WebSocket server running (PID: $PYTHON_PID)${NC}"
 echo ""
 
 # Start Next.js dev server

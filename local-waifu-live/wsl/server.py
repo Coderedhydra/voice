@@ -7,6 +7,7 @@ Runs on Ubuntu WSL, communicates with Unity on Windows host
 
 import asyncio
 import json
+import os
 import subprocess
 import re
 import signal
@@ -24,7 +25,8 @@ except ImportError:
 # Configuration
 WEBSOCKET_HOST = "localhost"  # Bind to localhost only
 WEBSOCKET_PORT = 8765
-OLLAMA_MODEL = "llama3"  # Options: llama3, llama3.1, deepseek-r1
+# Default model - can be overridden via environment variable
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:4b")  # Options: qwen2.5:4b, qwen3:4b, llama3, llama3.1
 SYSTEM_PROMPT_FILE = Path(__file__).parent / "waifu_system.txt"
 
 # Global state

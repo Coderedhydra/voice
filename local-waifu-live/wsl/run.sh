@@ -72,8 +72,8 @@ if ! pgrep -x "ollama" > /dev/null; then
 fi
 echo -e "${GREEN}[✓] Ollama server running${NC}"
 
-# Check for model
-MODEL="llama3"
+# Check for model (use environment variable or default)
+MODEL="${OLLAMA_MODEL:-qwen2.5:4b}"
 if ! ollama list | grep -q "$MODEL"; then
     echo -e "${YELLOW}[!] Model '$MODEL' not found. Pulling...${NC}"
     ollama pull "$MODEL"
@@ -83,7 +83,8 @@ echo -e "${GREEN}[✓] Model '$MODEL' ready${NC}"
 echo ""
 echo "========================================"
 echo "  Starting WebSocket Server"
-echo "  Connect Unity to: ws://localhost:8765"
+echo "  Connect Web Client to: ws://localhost:8765"
+echo "  Model: $MODEL"
 echo "========================================"
 echo ""
 

@@ -54,7 +54,10 @@ pip install --upgrade pip -q
 
 # Install Python dependencies in virtual environment
 echo -e "${YELLOW}[*] Installing Python dependencies...${NC}"
+pip install -q --upgrade pip
 pip install -q -r requirements.txt
+# Ensure requests is installed
+pip install -q requests>=2.31.0
 echo -e "${GREEN}[✓] Dependencies installed${NC}"
 
 # Check Ollama

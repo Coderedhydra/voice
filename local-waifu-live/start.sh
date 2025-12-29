@@ -85,6 +85,25 @@ fi
 # Activate venv and start server directly
 source venv/bin/activate
 
+# Verify and install requests if missing
+if ! python -c "import requests" 2>/dev/null; then
+    echo -e "${YELLOW}[*] Installing requests in virtual environment...${NC}"
+    pip install -q --upgrade pip
+    pip install -q requests>=2.31.0
+    # Also reinstall all requirements to ensure everything is there
+    pip install -q -r requirements.txt
+    echo -e "${GREEN}[✓] Requests installed${NC}"
+fi
+
+# Verify all dependencies
+if ! python -c "import websockets, requests" 2>/dev/null; then
+    echo -e "${YELLOW}[*] Reinstalling all dependencies...${NC}"
+    pip install -q --upgrade pip
+    pip install -q -r requirements.txt
+    pip install -q requests>=2.31.0
+    echo -e "${GREEN}[✓] Dependencies reinstalled${NC}"
+fi
+
 # Ensure Ollama is running
 if ! pgrep -x "ollama" > /dev/null; then
     echo -e "${YELLOW}[*] Starting Ollama server...${NC}"

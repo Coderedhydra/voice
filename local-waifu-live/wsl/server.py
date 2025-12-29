@@ -67,59 +67,69 @@ def check_model_available(model: str) -> bool:
 
 
 def query_ollama_fast(user_message: str, history: list) -> str:
-    """Query Ollama using HTTP API for faster responses."""
+    """Query Ollama using HTTP API for faster responses - optimized for speed."""
     global system_prompt
     
-    # Build messages array for API
+    # Build messages array for API - shorter for speed
     messages = []
     
-    # Add system prompt
+    # Add system prompt (shortened version for speed)
+    system_msg = system_prompt[:500] if len(system_prompt) > 500 else system_prompt
     messages.append({
         "role": "system",
-        "content": system_prompt
+        "content": system_msg
     })
     
-    # Add conversation history (last 8 exchanges for speed)
-    for exchange in history[-8:]:
-        messages.append({"role": "user", "content": exchange['user']})
-        messages.append({"role": "assistant", "content": exchange['assistant']})
+    # Add conversation history (last 5 exchanges for maximum speed)
+    for exchange in history[-5:]:
+        # Truncate long messages
+        user_msg = exchange['user'][:100] if len(exchange['user']) > 100 else exchange['user']
+        assistant_msg = exchange['assistant'][:150] if len(exchange['assistant']) > 150 else exchange['assistant']
+        messages.append({"role": "user", "content": user_msg})
+        messages.append({"role": "assistant", "content": assistant_msg})
     
-    # Add current user message
-    messages.append({"role": "user", "content": user_message})
+    # Add current user message (truncated)
+    user_msg = user_message[:150] if len(user_message) > 150 else user_message
+    messages.append({"role": "user", "content": user_msg})
     
     try:
-        # Use streaming API for faster initial response
+        # Optimized for speed - shorter responses, faster generation
         payload = {
             "model": OLLAMA_MODEL,
             "messages": messages,
-            "stream": False,  # Non-streaming for simplicity, but faster than subprocess
+            "stream": False,
             "options": {
-                "temperature": 0.8,
-                "top_p": 0.9,
-                "num_predict": 150,  # Limit response length for speed
+                "temperature": 0.7,  # Lower for faster, more consistent
+                "top_p": 0.85,
+                "top_k": 20,  # Limit choices for speed
+                "num_predict": 100,  # Shorter responses = faster
+                "repeat_penalty": 1.1,
+                "num_ctx": 1024,  # Smaller context = faster
             }
         }
         
         response = requests.post(
             OLLAMA_API_URL,
             json=payload,
-            timeout=30  # 30 second timeout
+            timeout=15  # Shorter timeout for faster failure detection
         )
         
         if response.status_code == 200:
             result = response.json()
-            return result.get("response", "").strip()
+            response_text = result.get("response", "").strip()
+            # Quick response if empty
+            if not response_text:
+                return generate_fallback_response()
+            return response_text
         else:
-            print(f"Ollama API error: {response.status_code} - {response.text}")
+            print(f"Ollama API error: {response.status_code} - {response.text[:100]}")
             return generate_fallback_response()
             
     except requests.exceptions.Timeout:
-        print("Ollama API request timed out")
+        print("Ollama API request timed out - using fallback")
         return generate_fallback_response()
     except Exception as e:
         print(f"Ollama API request failed: {e}")
-        import traceback
-        traceback.print_exc()
         return generate_fallback_response()
 
 

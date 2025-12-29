@@ -67,7 +67,7 @@ echo -e "${GREEN}[✓] Ollama installed${NC}"
 # Start Ollama server in background if not running
 if ! pgrep -x "ollama" > /dev/null; then
     echo -e "${YELLOW}[*] Starting Ollama server...${NC}"
-    ollama serve &
+    ollama serve > /dev/null 2>&1 &
     sleep 3
 fi
 echo -e "${GREEN}[✓] Ollama server running${NC}"
@@ -87,6 +87,24 @@ echo "  Connect Web Client to: ws://localhost:8765"
 echo "  Model: $MODEL"
 echo "========================================"
 echo ""
+
+# Kill any existing server on port 8765
+if command -v lsof > /dev/null; then
+    PID=$(lsof -ti:8765 2>/dev/null || true)
+    if [ ! -z "$PID" ]; then
+        echo -e "${YELLOW}[*] Killing existing process on port 8765 (PID: $PID)...${NC}"
+        kill -9 $PID 2>/dev/null || true
+        sleep 2
+    fi
+elif command -v fuser > /dev/null; then
+    echo -e "${YELLOW}[*] Killing existing process on port 8765...${NC}"
+    fuser -k 8765/tcp 2>/dev/null || true
+    sleep 2
+fi
+
+# Also kill any Python server processes
+pkill -f "python.*server.py" 2>/dev/null || true
+sleep 1
 
 # Run the server using the virtual environment's Python
 python server.py

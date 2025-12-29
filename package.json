@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@netlify/blobs": "^10.4.3",
-    "@react-three/drei": "^9.122.0",
-    "@react-three/fiber": "^8.18.0",
+    "@react-three/drei": "^9.88.13",
+    "@react-three/fiber": "^8.15.11",
     "blobshape": "^1.0.0",
     "bright": "^1.0.0",
     "markdown-to-jsx": "^7.7.16",

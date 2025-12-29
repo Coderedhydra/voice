@@ -1,9 +1,14 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei';
+import React, { useRef, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import * as THREE from 'three';
+
+// Dynamically import Canvas to avoid SSR issues
+const Canvas = dynamic(() => import('@react-three/fiber').then(mod => mod.Canvas), { 
+  ssr: false,
+  loading: () => <div className="w-full h-full flex items-center justify-center text-white">Loading 3D renderer...</div>
+});
 
 // Animation states mapping
 const animationStates = {
@@ -26,7 +31,7 @@ const expressionMaterials = {
   look_away: { color: '#ffb3d9', emissive: '#ff99cc' },
 };
 
-// Character component
+// Character component - must be inside Canvas
 function Character({ animation, expression, intensity }) {
   const groupRef = useRef();
   const bodyRef = useRef();
@@ -35,6 +40,9 @@ function Character({ animation, expression, intensity }) {
   const [currentExpression, setCurrentExpression] = useState('smile_seductive');
   const [targetState, setTargetState] = useState(null);
   const timeRef = useRef(0);
+
+  // Import useFrame dynamically inside component
+  const { useFrame } = require('@react-three/fiber');
 
   // Update animation when props change
   useEffect(() => {
@@ -197,34 +205,53 @@ function Character({ animation, expression, intensity }) {
   );
 }
 
+// Scene component that uses drei components
+function Scene({ animation, expression, intensity }) {
+  const { OrbitControls, PerspectiveCamera, Environment } = require('@react-three/drei');
+  
+  return (
+    <>
+      <PerspectiveCamera makeDefault position={[0, 0.5, 3]} fov={50} />
+      <OrbitControls
+        enablePan={false}
+        minDistance={2}
+        maxDistance={5}
+        minPolarAngle={Math.PI / 6}
+        maxPolarAngle={Math.PI / 2.2}
+      />
+      
+      {/* Lighting */}
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[5, 5, 5]} intensity={0.8} castShadow />
+      <pointLight position={[-5, 3, -5]} intensity={0.5} color="#ffb3d9" />
+      <pointLight position={[5, 3, -5]} intensity={0.5} color="#ff99cc" />
+      
+      {/* Environment */}
+      <Environment preset="sunset" />
+      
+      {/* Character */}
+      <Character
+        animation={animation?.body || 'idle_soft'}
+        expression={expression || animation?.face || 'smile_seductive'}
+        intensity={intensity || animation?.intensity || 0.5}
+      />
+    </>
+  );
+}
+
 // Main renderer component
 export function CharacterRenderer({ animation, expression, intensity }) {
+  if (typeof window === 'undefined') {
+    return <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900" />;
+  }
+
   return (
     <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900">
       <Canvas shadows>
-        <PerspectiveCamera makeDefault position={[0, 0.5, 3]} fov={50} />
-        <OrbitControls
-          enablePan={false}
-          minDistance={2}
-          maxDistance={5}
-          minPolarAngle={Math.PI / 6}
-          maxPolarAngle={Math.PI / 2.2}
-        />
-        
-        {/* Lighting */}
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[5, 5, 5]} intensity={0.8} castShadow />
-        <pointLight position={[-5, 3, -5]} intensity={0.5} color="#ffb3d9" />
-        <pointLight position={[5, 3, -5]} intensity={0.5} color="#ff99cc" />
-        
-        {/* Environment */}
-        <Environment preset="sunset" />
-        
-        {/* Character */}
-        <Character
-          animation={animation?.body || 'idle_soft'}
-          expression={expression || animation?.face || 'smile_seductive'}
-          intensity={intensity || animation?.intensity || 0.5}
+        <Scene 
+          animation={animation}
+          expression={expression}
+          intensity={intensity}
         />
       </Canvas>
     </div>

@@ -2,6 +2,19 @@
 const nextConfig = {
   reactCompiler: true,
   
+  webpack: (config, { isServer }) => {
+    // Fix for React Three Fiber compatibility
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        crypto: false,
+      };
+    }
+    return config;
+  },
+  
   redirects() {
     return [
       {

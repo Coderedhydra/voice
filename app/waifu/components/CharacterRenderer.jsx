@@ -1,312 +1,209 @@
 'use client';
 
-import React, { useRef, useEffect, useState, Suspense } from 'react';
-import * as THREE from 'three';
+import React, { useRef, useEffect, useState } from 'react';
 
 // Animation states mapping
 const animationStates = {
-  idle_soft: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
-  lean_forward: { position: [0, -0.2, 0.3], rotation: [-0.1, 0, 0], scale: 1 },
-  sway_hips: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
-  teasing_pose: { position: [0, 0.1, 0], rotation: [0, 0.2, 0], scale: 1 },
-  close_intimate_pose: { position: [0, -0.1, 0.5], rotation: [-0.15, 0, 0], scale: 1.05 },
-  slow_breathing: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
-  shy_cover: { position: [0, 0.1, -0.2], rotation: [0, -0.3, 0], scale: 0.95 },
+  idle_soft: { offsetY: 0, rotation: 0, scale: 1 },
+  lean_forward: { offsetY: -20, rotation: -5, scale: 1 },
+  sway_hips: { offsetY: 0, rotation: 0, scale: 1 },
+  teasing_pose: { offsetY: 10, rotation: 5, scale: 1 },
+  close_intimate_pose: { offsetY: -10, rotation: -8, scale: 1.05 },
+  slow_breathing: { offsetY: 0, rotation: 0, scale: 1 },
+  shy_cover: { offsetY: 10, rotation: -10, scale: 0.95 },
 };
 
-// Facial expression colors/materials
-const expressionMaterials = {
-  smile_seductive: { color: '#ffb3d9', emissive: '#ff66b3' },
-  blush_light: { color: '#ffcccc', emissive: '#ff9999' },
-  blush_heavy: { color: '#ff6666', emissive: '#ff3333' },
-  half_lidded_eyes: { color: '#ffb3d9', emissive: '#ff80cc' },
-  soft_moan: { color: '#ff99cc', emissive: '#ff66b3' },
-  look_away: { color: '#ffb3d9', emissive: '#ff99cc' },
+// Facial expression colors
+const expressionColors = {
+  smile_seductive: { face: '#ffb3d9', blush: '#ff66b3', eyes: '#ff80cc' },
+  blush_light: { face: '#ffcccc', blush: '#ff9999', eyes: '#ff99cc' },
+  blush_heavy: { face: '#ff6666', blush: '#ff3333', eyes: '#ff66b3' },
+  half_lidded_eyes: { face: '#ffb3d9', blush: '#ff80cc', eyes: '#ff99cc' },
+  soft_moan: { face: '#ff99cc', blush: '#ff66b3', eyes: '#ff80cc' },
+  look_away: { face: '#ffb3d9', blush: '#ff99cc', eyes: '#ffb3d9' },
 };
 
-// Character component - must be inside Canvas
-function Character({ animation, expression, intensity }) {
-  const groupRef = useRef();
-  const bodyRef = useRef();
-  const faceRef = useRef();
-  const [currentAnimation, setCurrentAnimation] = useState('idle_soft');
-  const [currentExpression, setCurrentExpression] = useState('smile_seductive');
-  const [targetState, setTargetState] = useState(null);
+// 2D Character Renderer Component
+function Character2D({ animation, expression, intensity }) {
+  const canvasRef = useRef(null);
+  const animationFrameRef = useRef(null);
   const timeRef = useRef(0);
+  const [currentState, setCurrentState] = useState({
+    animation: 'idle_soft',
+    expression: 'smile_seductive',
+    intensity: 0.5,
+  });
 
-  // Update animation when props change
   useEffect(() => {
     if (animation) {
-      setTargetState({
+      setCurrentState({
         animation: animation.body || 'idle_soft',
         expression: animation.face || expression || 'smile_seductive',
         intensity: animation.intensity || intensity || 0.5,
-        timestamp: Date.now(),
       });
     }
   }, [animation, expression, intensity]);
 
-  // Animation loop - use useFrame hook properly
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Import useFrame dynamically only on client
-    import('@react-three/fiber').then((r3f) => {
-      const { useFrame } = r3f;
-      
-      // This won't work here - useFrame must be called at component level
-      // We'll handle animation differently
-    });
-  }, []);
-
-  // Use requestAnimationFrame for animation instead of useFrame to avoid React context issues
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    let animationId;
-    const animate = () => {
-      timeRef.current += 0.016; // ~60fps
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-      if (targetState) {
-        const animState = animationStates[targetState.animation] || animationStates.idle_soft;
-        const exprMat = expressionMaterials[targetState.expression] || expressionMaterials.smile_seductive;
-        
-        // Smooth interpolation
-        if (groupRef.current) {
-          const targetPos = animState.position;
-          const targetRot = animState.rotation;
-          const targetScale = animState.scale * (0.9 + targetState.intensity * 0.2);
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
 
-          groupRef.current.position.lerp(new THREE.Vector3(...targetPos), 0.15);
-          groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRot[0], 0.15);
-          groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRot[1], 0.15);
-          groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
-        }
+    const drawCharacter = () => {
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Update expression material
-        if (faceRef.current) {
-          const mat = faceRef.current.material;
-          mat.color.lerp(new THREE.Color(exprMat.color), 0.15);
-          mat.emissive.lerp(new THREE.Color(exprMat.emissive), 0.15);
-          mat.emissiveIntensity = 0.3 + targetState.intensity * 0.7;
-        }
-
-        setCurrentAnimation(targetState.animation);
-        setCurrentExpression(targetState.expression);
-      }
+      const animState = animationStates[currentState.animation] || animationStates.idle_soft;
+      const exprColors = expressionColors[currentState.expression] || expressionColors.smile_seductive;
+      
+      // Apply transformations
+      ctx.save();
+      ctx.translate(centerX, centerY + animState.offsetY);
+      ctx.rotate((animState.rotation * Math.PI) / 180);
+      ctx.scale(animState.scale * (0.9 + currentState.intensity * 0.2), animState.scale * (0.9 + currentState.intensity * 0.2));
 
       // Breathing animation
-      if (currentAnimation === 'idle_soft' || currentAnimation === 'slow_breathing') {
-        const breathSpeed = currentAnimation === 'slow_breathing' ? 0.8 : 1.5;
-        const breathAmount = currentAnimation === 'slow_breathing' ? 0.15 : 0.08;
-        if (bodyRef.current) {
-          bodyRef.current.scale.y = 1 + Math.sin(timeRef.current * breathSpeed) * breathAmount;
-        }
+      const breathAmount = currentState.animation === 'slow_breathing' ? 0.15 : 0.08;
+      const breathSpeed = currentState.animation === 'slow_breathing' ? 0.8 : 1.5;
+      const breathScale = 1 + Math.sin(timeRef.current * breathSpeed) * breathAmount;
+
+      // Body (dress/torso)
+      ctx.fillStyle = exprColors.face;
+      ctx.beginPath();
+      ctx.ellipse(0, 40, 80, 120 * breathScale, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Blush effect
+      if (currentState.expression.includes('blush')) {
+        const blushIntensity = currentState.expression === 'blush_heavy' ? 0.8 : 0.5;
+        ctx.fillStyle = `rgba(255, 102, 179, ${blushIntensity * currentState.intensity})`;
+        ctx.beginPath();
+        ctx.ellipse(-30, 20, 25, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(30, 20, 25, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
+
+      // Head
+      ctx.fillStyle = '#ffe6f2';
+      ctx.beginPath();
+      ctx.arc(0, -80, 60, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Hair
+      ctx.fillStyle = '#ff66b3';
+      ctx.beginPath();
+      ctx.arc(0, -100, 65, 0, Math.PI * 2);
+      ctx.fill();
+      // Hair bangs
+      ctx.beginPath();
+      ctx.arc(-20, -85, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(20, -85, 15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Eyes
+      const eyeY = currentState.expression === 'half_lidded_eyes' ? -75 : -78;
+      const eyeSize = currentState.expression === 'half_lidded_eyes' ? 8 : 12;
+      
+      ctx.fillStyle = '#333';
+      // Left eye
+      ctx.beginPath();
+      ctx.arc(-20, eyeY, eyeSize, 0, Math.PI * 2);
+      ctx.fill();
+      // Right eye
+      ctx.beginPath();
+      ctx.arc(20, eyeY, eyeSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Eye sparkle
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-18, eyeY - 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(22, eyeY - 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Mouth (smile)
+      ctx.strokeStyle = exprColors.face;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      if (currentState.expression === 'soft_moan') {
+        ctx.arc(0, -65, 8, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.arc(0, -65, 15, 0, Math.PI);
+        ctx.stroke();
+      }
+
+      // Arms
+      ctx.fillStyle = '#ffe6f2';
+      // Left arm
+      ctx.beginPath();
+      ctx.ellipse(-70, 30, 15, 50, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      // Right arm
+      ctx.beginPath();
+      ctx.ellipse(70, 30, 15, 50, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Legs
+      ctx.fillStyle = exprColors.face;
+      // Left leg
+      ctx.beginPath();
+      ctx.ellipse(-25, 140, 18, 60, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Right leg
+      ctx.beginPath();
+      ctx.ellipse(25, 140, 18, 60, 0, 0, Math.PI * 2);
+      ctx.fill();
 
       // Sway animation
-      if (currentAnimation === 'sway_hips') {
-        if (groupRef.current) {
-          groupRef.current.rotation.z = Math.sin(timeRef.current * 1.2) * 0.1;
-          groupRef.current.position.x = Math.sin(timeRef.current * 1.2) * 0.1;
-        }
+      if (currentState.animation === 'sway_hips') {
+        ctx.translate(Math.sin(timeRef.current * 1.2) * 10, 0);
+        ctx.rotate(Math.sin(timeRef.current * 1.2) * 0.1);
       }
 
-      animationId = requestAnimationFrame(animate);
+      ctx.restore();
+
+      // Glow effect based on intensity
+      if (currentState.intensity > 0.5) {
+        ctx.shadowBlur = 30 * currentState.intensity;
+        ctx.shadowColor = exprColors.blush;
+      }
     };
 
-    animationId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationId);
-  }, [targetState, currentAnimation]);
+    const animate = () => {
+      timeRef.current += 0.016; // ~60fps
+      drawCharacter();
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    // Initial draw
+    drawCharacter();
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [currentState]);
 
   return (
-    <group ref={groupRef}>
-      {/* Body */}
-      <mesh ref={bodyRef} position={[0, 0, 0]}>
-        <capsuleGeometry args={[0.3, 1.2, 6, 12]} />
-        <meshStandardMaterial
-          color="#ffb3d9"
-          roughness={0.4}
-          metalness={0.1}
-          emissive="#ff99cc"
-          emissiveIntensity={0.2}
-        />
-      </mesh>
-
-      {/* Head */}
-      <mesh position={[0, 0.8, 0]}>
-        <sphereGeometry args={[0.25, 20, 20]} />
-        <meshStandardMaterial
-          color="#ffe6f2"
-          roughness={0.3}
-          metalness={0.05}
-        />
-      </mesh>
-
-      {/* Face (expression) */}
-      <mesh ref={faceRef} position={[0, 0.85, 0.22]}>
-        <planeGeometry args={[0.3, 0.3]} />
-        <meshStandardMaterial
-          color={expressionMaterials[currentExpression].color}
-          emissive={expressionMaterials[currentExpression].emissive}
-          emissiveIntensity={0.3}
-          transparent
-          opacity={0.9}
-        />
-      </mesh>
-
-      {/* Hair */}
-      <mesh position={[0, 1.0, -0.1]}>
-        <capsuleGeometry args={[0.28, 0.4, 6, 12]} />
-        <meshStandardMaterial
-          color="#ff66b3"
-          roughness={0.5}
-          metalness={0.1}
-        />
-      </mesh>
-
-      {/* Arms */}
-      <mesh position={[-0.4, 0.2, 0]} rotation={[0, 0, 0.3]}>
-        <capsuleGeometry args={[0.08, 0.5, 6, 12]} />
-        <meshStandardMaterial
-          color="#ffe6f2"
-          roughness={0.4}
-          metalness={0.1}
-        />
-      </mesh>
-      <mesh position={[0.4, 0.2, 0]} rotation={[0, 0, -0.3]}>
-        <capsuleGeometry args={[0.08, 0.5, 6, 12]} />
-        <meshStandardMaterial
-          color="#ffe6f2"
-          roughness={0.4}
-          metalness={0.1}
-        />
-      </mesh>
-
-      {/* Legs */}
-      <mesh position={[-0.15, -0.7, 0]}>
-        <capsuleGeometry args={[0.1, 0.6, 6, 12]} />
-        <meshStandardMaterial
-          color="#ffb3d9"
-          roughness={0.4}
-          metalness={0.1}
-        />
-      </mesh>
-      <mesh position={[0.15, -0.7, 0]}>
-        <capsuleGeometry args={[0.1, 0.6, 6, 12]} />
-        <meshStandardMaterial
-          color="#ffb3d9"
-          roughness={0.4}
-          metalness={0.1}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-// Scene component
-function Scene({ animation, expression, intensity }) {
-  const [dreiLoaded, setDreiLoaded] = useState(false);
-  const [dreiComponents, setDreiComponents] = useState(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      import('@react-three/drei').then((drei) => {
-        setDreiComponents({
-          OrbitControls: drei.OrbitControls,
-          PerspectiveCamera: drei.PerspectiveCamera,
-          Environment: drei.Environment,
-        });
-        setDreiLoaded(true);
-      }).catch((err) => {
-        console.error('Failed to load drei components:', err);
-        setDreiLoaded(true); // Still render without drei
-      });
-    }
-  }, []);
-
-  return (
-    <>
-      {dreiLoaded && dreiComponents ? (
-        <>
-          <dreiComponents.PerspectiveCamera makeDefault position={[0, 0.5, 3]} fov={50} />
-          <dreiComponents.OrbitControls
-            enablePan={false}
-            minDistance={2}
-            maxDistance={5}
-            minPolarAngle={Math.PI / 6}
-            maxPolarAngle={Math.PI / 2.2}
-            enableDamping={true}
-            dampingFactor={0.05}
-          />
-          <dreiComponents.Environment preset="sunset" />
-        </>
-      ) : (
-        <perspectiveCamera position={[0, 0.5, 3]} fov={50} />
-      )}
-      
-      {/* Lighting */}
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 5, 5]} intensity={0.8} />
-      <pointLight position={[-3, 2, -3]} intensity={0.4} color="#ffb3d9" />
-      <pointLight position={[3, 2, -3]} intensity={0.4} color="#ff99cc" />
-      
-      {/* Character - always render */}
-      <Character
-        animation={animation?.body || 'idle_soft'}
-        expression={expression || animation?.face || 'smile_seductive'}
-        intensity={intensity || animation?.intensity || 0.5}
-      />
-    </>
-  );
-}
-
-// Canvas wrapper component
-function CanvasWrapper({ animation, expression, intensity }) {
-  const [CanvasComponent, setCanvasComponent] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      import('@react-three/fiber').then((mod) => {
-        setCanvasComponent(() => mod.Canvas);
-        setLoading(false);
-      }).catch((err) => {
-        console.error('Failed to load Canvas:', err);
-        setLoading(false);
-      });
-    }
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center text-white">
-        <div>Loading 3D renderer...</div>
-      </div>
-    );
-  }
-
-  if (!CanvasComponent) {
-    return (
-      <div className="w-full h-full flex items-center justify-center text-white">
-        <div>Failed to load 3D renderer</div>
-      </div>
-    );
-  }
-
-  return (
-    <CanvasComponent 
-      gl={{ antialias: true, powerPreference: "high-performance" }}
-      dpr={[1, 2]}
-    >
-      <Suspense fallback={null}>
-        <Scene 
-          animation={animation}
-          expression={expression}
-          intensity={intensity}
-        />
-      </Suspense>
-    </CanvasComponent>
+    <canvas
+      ref={canvasRef}
+      width={400}
+      height={600}
+      className="w-full h-full"
+      style={{ imageRendering: 'high-quality' }}
+    />
   );
 }
 
@@ -321,18 +218,27 @@ export function CharacterRenderer({ animation, expression, intensity }) {
   if (!mounted) {
     return (
       <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900 flex items-center justify-center">
-        <div className="text-white text-lg">Loading 3D renderer...</div>
+        <div className="text-white text-lg">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900">
-      <CanvasWrapper 
-        animation={animation}
-        expression={expression}
-        intensity={intensity}
-      />
+    <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900 flex items-center justify-center relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute top-0 left-0 w-96 h-96 bg-pink-500 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+      </div>
+      
+      {/* 2D Character */}
+      <div className="relative z-10">
+        <Character2D
+          animation={animation}
+          expression={expression}
+          intensity={intensity}
+        />
+      </div>
     </div>
   );
 }

@@ -61,7 +61,7 @@ echo ""
 # Check if Node.js dependencies are installed
 if [ ! -d "node_modules" ] || [ ! -f "node_modules/.bin/next" ]; then
     echo -e "${YELLOW}[*] Installing Node.js dependencies...${NC}"
-    npm install
+    npm install --legacy-peer-deps
     echo -e "${GREEN}[✓] Dependencies installed${NC}"
     echo ""
 fi

@@ -18,6 +18,7 @@ from typing import Optional, Tuple
 try:
     import websockets
     from websockets.server import serve
+    from websockets.exceptions import ConnectionClosed, ConnectionClosedError, InvalidHandshake
 except ImportError:
     print("ERROR: websockets not installed. Run: pip install websockets")
     sys.exit(1)
@@ -26,7 +27,7 @@ except ImportError:
 WEBSOCKET_HOST = "localhost"  # Bind to localhost only
 WEBSOCKET_PORT = 8765
 # Default model - can be overridden via environment variable
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:4b")  # Options: qwen2.5:4b, qwen3:4b, llama3, llama3.1
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:4b")  # Options: qwen2.5:4b, qwen3:4b, llama3, llama3.1
 SYSTEM_PROMPT_FILE = Path(__file__).parent / "waifu_system.txt"
 
 # Global state
@@ -221,12 +222,12 @@ def process_response(response: str) -> Tuple[dict, str]:
     return animation, chat_text
 
 
-async def handle_client(websocket):
-    """Handle a connected Unity client."""
+async def handle_client(websocket, path):
+    """Handle a connected WebSocket client."""
     global conversation_history
     
     client_address = websocket.remote_address
-    print(f"[+] Unity client connected: {client_address}")
+    print(f"[+] WebSocket client connected: {client_address} (path: {path})")
     connected_clients.add(websocket)
     
     # Send welcome message
@@ -249,6 +250,10 @@ async def handle_client(websocket):
     
     try:
         async for message in websocket:
+            # Handle both string and bytes messages
+            if isinstance(message, bytes):
+                message = message.decode('utf-8')
+            
             print(f"[<] Received: {message[:100]}...")
             
             try:
@@ -290,10 +295,14 @@ async def handle_client(websocket):
             # Send to client
             await websocket.send(json.dumps(payload))
             
-    except websockets.exceptions.ConnectionClosed:
+    except ConnectionClosed:
         print(f"[-] Client disconnected: {client_address}")
+    except ConnectionClosedError:
+        print(f"[-] Client connection closed: {client_address}")
     except Exception as e:
         print(f"[!] Error handling client: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         connected_clients.discard(websocket)
 
@@ -332,7 +341,7 @@ async def main():
             print(f"[✓] Model '{OLLAMA_MODEL}' ready")
     
     print(f"[*] Starting WebSocket server on ws://{WEBSOCKET_HOST}:{WEBSOCKET_PORT}")
-    print("[*] Waiting for Unity client connection...")
+    print("[*] Waiting for WebSocket client connection...")
     print("-" * 60)
     
     # Handle graceful shutdown
@@ -346,7 +355,19 @@ async def main():
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, signal_handler)
     
-    async with serve(handle_client, WEBSOCKET_HOST, WEBSOCKET_PORT):
+    # Create WebSocket server with proper configuration for browser clients
+    # origins=None allows connections from any origin (for localhost development)
+    async with serve(
+        handle_client,
+        WEBSOCKET_HOST,
+        WEBSOCKET_PORT,
+        ping_interval=20,
+        ping_timeout=10,
+        close_timeout=10,
+        max_size=2**20,  # 1MB max message size
+        origins=None,  # Allow all origins for localhost development
+    ):
+        print(f"[✓] WebSocket server running on ws://{WEBSOCKET_HOST}:{WEBSOCKET_PORT}")
         await stop.wait()
     
     print("[*] Server stopped")

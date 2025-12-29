@@ -73,7 +73,7 @@ fi
 echo -e "${GREEN}[✓] Ollama server running${NC}"
 
 # Check for model (use environment variable or default)
-MODEL="${OLLAMA_MODEL:-qwen2.5:4b}"
+MODEL="${OLLAMA_MODEL:-qwen3:4b}"
 if ! ollama list | grep -q "$MODEL"; then
     echo -e "${YELLOW}[!] Model '$MODEL' not found. Pulling...${NC}"
     ollama pull "$MODEL"

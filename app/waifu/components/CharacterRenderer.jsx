@@ -4,9 +4,9 @@ import React, { useRef, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import * as THREE from 'three';
 
-// Dynamically import Canvas and drei components to avoid SSR issues
+// Dynamically import Canvas to avoid SSR issues - must not render on server
 const Canvas = dynamic(
-  () => import('@react-three/fiber').then(mod => mod.Canvas), 
+  () => import('@react-three/fiber').then(mod => ({ default: mod.Canvas })), 
   { 
     ssr: false,
     loading: () => (
@@ -15,22 +15,6 @@ const Canvas = dynamic(
       </div>
     )
   }
-);
-
-// Dynamically import drei components
-const OrbitControls = dynamic(
-  () => import('@react-three/drei').then(mod => mod.OrbitControls),
-  { ssr: false }
-);
-
-const PerspectiveCamera = dynamic(
-  () => import('@react-three/drei').then(mod => mod.PerspectiveCamera),
-  { ssr: false }
-);
-
-const Environment = dynamic(
-  () => import('@react-three/drei').then(mod => mod.Environment),
-  { ssr: false }
 );
 
 // Animation states mapping
@@ -228,8 +212,31 @@ function Character({ animation, expression, intensity }) {
   );
 }
 
-// Scene component - only renders client-side
+// Scene component with drei components - dynamically imported
 function Scene({ animation, expression, intensity }) {
+  const [dreiLoaded, setDreiLoaded] = useState(false);
+  const [dreiComponents, setDreiComponents] = useState(null);
+
+  useEffect(() => {
+    // Load drei components only on client side
+    if (typeof window !== 'undefined') {
+      import('@react-three/drei').then((drei) => {
+        setDreiComponents({
+          OrbitControls: drei.OrbitControls,
+          PerspectiveCamera: drei.PerspectiveCamera,
+          Environment: drei.Environment,
+        });
+        setDreiLoaded(true);
+      });
+    }
+  }, []);
+
+  if (!dreiLoaded || !dreiComponents) {
+    return null;
+  }
+
+  const { OrbitControls, PerspectiveCamera, Environment } = dreiComponents;
+
   return (
     <>
       <PerspectiveCamera makeDefault position={[0, 0.5, 3]} fov={50} />
@@ -268,7 +275,16 @@ export function CharacterRenderer({ animation, expression, intensity }) {
     setMounted(true);
   }, []);
 
-  if (!mounted) {
+  if (!mounted || typeof window === 'undefined') {
+    return (
+      <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900 flex items-center justify-center">
+        <div className="text-white text-lg">Loading 3D renderer...</div>
+      </div>
+    );
+  }
+
+  // Ensure Canvas is loaded before rendering
+  if (!Canvas) {
     return (
       <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900 flex items-center justify-center">
         <div className="text-white text-lg">Loading 3D renderer...</div>

@@ -2,12 +2,15 @@
 #
 # Local Waifu Live - Run Script
 # Starts Ollama and the WebSocket server
+# Uses Python virtual environment for dependencies
 #
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+VENV_DIR="$SCRIPT_DIR/venv"
 
 echo "========================================"
 echo "  LOCAL WAIFU LIVE - Startup Script"
@@ -26,16 +29,32 @@ if ! command -v python3 &> /dev/null; then
 fi
 echo -e "${GREEN}[✓] Python 3 found${NC}"
 
-# Check pip
-if ! command -v pip3 &> /dev/null; then
-    echo -e "${YELLOW}[!] pip3 not found. Installing...${NC}"
-    sudo apt update && sudo apt install -y python3-pip
+# Check for python3-venv
+if ! python3 -m venv --help &> /dev/null 2>&1; then
+    echo -e "${YELLOW}[!] python3-venv not found. Installing...${NC}"
+    sudo apt update && sudo apt install -y python3-venv python3-full
 fi
-echo -e "${GREEN}[✓] pip3 available${NC}"
 
-# Install Python dependencies
+# Create virtual environment if it doesn't exist
+if [ ! -d "$VENV_DIR" ]; then
+    echo -e "${YELLOW}[*] Creating Python virtual environment...${NC}"
+    python3 -m venv "$VENV_DIR"
+    echo -e "${GREEN}[✓] Virtual environment created${NC}"
+else
+    echo -e "${GREEN}[✓] Virtual environment exists${NC}"
+fi
+
+# Activate virtual environment
+source "$VENV_DIR/bin/activate"
+echo -e "${GREEN}[✓] Virtual environment activated${NC}"
+
+# Upgrade pip in venv
+echo -e "${YELLOW}[*] Upgrading pip...${NC}"
+pip install --upgrade pip -q
+
+# Install Python dependencies in virtual environment
 echo -e "${YELLOW}[*] Installing Python dependencies...${NC}"
-pip3 install -q -r requirements.txt
+pip install -q -r requirements.txt
 echo -e "${GREEN}[✓] Dependencies installed${NC}"
 
 # Check Ollama
@@ -68,5 +87,5 @@ echo "  Connect Unity to: ws://localhost:8765"
 echo "========================================"
 echo ""
 
-# Run the server
-python3 server.py
+# Run the server using the virtual environment's Python
+python server.py

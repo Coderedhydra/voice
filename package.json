@@ -12,13 +12,13 @@
   "dependencies": {
     "@netlify/blobs": "^10.4.3",
     "@react-three/drei": "^9.88.13",
-    "@react-three/fiber": "^8.15.11",
+    "@react-three/fiber": "^8.15.19",
     "blobshape": "^1.0.0",
     "bright": "^1.0.0",
     "markdown-to-jsx": "^7.7.16",
     "next": "^16.0.8",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "three": "^0.169.0",
     "unique-names-generator": "^4.7.1"
   },

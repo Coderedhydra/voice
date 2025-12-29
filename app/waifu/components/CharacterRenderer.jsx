@@ -24,7 +24,7 @@ const expressionMaterials = {
   look_away: { color: '#ffb3d9', emissive: '#ff99cc' },
 };
 
-// Character component
+// Character component - must be inside Canvas
 function Character({ animation, expression, intensity }) {
   const groupRef = useRef();
   const bodyRef = useRef();
@@ -33,9 +33,6 @@ function Character({ animation, expression, intensity }) {
   const [currentExpression, setCurrentExpression] = useState('smile_seductive');
   const [targetState, setTargetState] = useState(null);
   const timeRef = useRef(0);
-
-  // Import useFrame hook
-  const { useFrame } = require('@react-three/fiber');
 
   // Update animation when props change
   useEffect(() => {
@@ -49,55 +46,78 @@ function Character({ animation, expression, intensity }) {
     }
   }, [animation, expression, intensity]);
 
-  // Animation loop - simplified for better performance
-  useFrame((state, delta) => {
-    timeRef.current += delta;
-
-    if (targetState) {
-      const animState = animationStates[targetState.animation] || animationStates.idle_soft;
-      const exprMat = expressionMaterials[targetState.expression] || expressionMaterials.smile_seductive;
+  // Animation loop - use useFrame hook properly
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Import useFrame dynamically only on client
+    import('@react-three/fiber').then((r3f) => {
+      const { useFrame } = r3f;
       
-      // Smooth interpolation
-      if (groupRef.current) {
-        const targetPos = animState.position;
-        const targetRot = animState.rotation;
-        const targetScale = animState.scale * (0.9 + targetState.intensity * 0.2);
+      // This won't work here - useFrame must be called at component level
+      // We'll handle animation differently
+    });
+  }, []);
 
-        groupRef.current.position.lerp(new THREE.Vector3(...targetPos), 0.15);
-        groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRot[0], 0.15);
-        groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRot[1], 0.15);
-        groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
+  // Use requestAnimationFrame for animation instead of useFrame to avoid React context issues
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    let animationId;
+    const animate = () => {
+      timeRef.current += 0.016; // ~60fps
+
+      if (targetState) {
+        const animState = animationStates[targetState.animation] || animationStates.idle_soft;
+        const exprMat = expressionMaterials[targetState.expression] || expressionMaterials.smile_seductive;
+        
+        // Smooth interpolation
+        if (groupRef.current) {
+          const targetPos = animState.position;
+          const targetRot = animState.rotation;
+          const targetScale = animState.scale * (0.9 + targetState.intensity * 0.2);
+
+          groupRef.current.position.lerp(new THREE.Vector3(...targetPos), 0.15);
+          groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRot[0], 0.15);
+          groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetRot[1], 0.15);
+          groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
+        }
+
+        // Update expression material
+        if (faceRef.current) {
+          const mat = faceRef.current.material;
+          mat.color.lerp(new THREE.Color(exprMat.color), 0.15);
+          mat.emissive.lerp(new THREE.Color(exprMat.emissive), 0.15);
+          mat.emissiveIntensity = 0.3 + targetState.intensity * 0.7;
+        }
+
+        setCurrentAnimation(targetState.animation);
+        setCurrentExpression(targetState.expression);
       }
 
-      // Update expression material
-      if (faceRef.current) {
-        const mat = faceRef.current.material;
-        mat.color.lerp(new THREE.Color(exprMat.color), 0.15);
-        mat.emissive.lerp(new THREE.Color(exprMat.emissive), 0.15);
-        mat.emissiveIntensity = 0.3 + targetState.intensity * 0.7;
+      // Breathing animation
+      if (currentAnimation === 'idle_soft' || currentAnimation === 'slow_breathing') {
+        const breathSpeed = currentAnimation === 'slow_breathing' ? 0.8 : 1.5;
+        const breathAmount = currentAnimation === 'slow_breathing' ? 0.15 : 0.08;
+        if (bodyRef.current) {
+          bodyRef.current.scale.y = 1 + Math.sin(timeRef.current * breathSpeed) * breathAmount;
+        }
       }
 
-      setCurrentAnimation(targetState.animation);
-      setCurrentExpression(targetState.expression);
-    }
-
-    // Breathing animation
-    if (currentAnimation === 'idle_soft' || currentAnimation === 'slow_breathing') {
-      const breathSpeed = currentAnimation === 'slow_breathing' ? 0.8 : 1.5;
-      const breathAmount = currentAnimation === 'slow_breathing' ? 0.15 : 0.08;
-      if (bodyRef.current) {
-        bodyRef.current.scale.y = 1 + Math.sin(timeRef.current * breathSpeed) * breathAmount;
+      // Sway animation
+      if (currentAnimation === 'sway_hips') {
+        if (groupRef.current) {
+          groupRef.current.rotation.z = Math.sin(timeRef.current * 1.2) * 0.1;
+          groupRef.current.position.x = Math.sin(timeRef.current * 1.2) * 0.1;
+        }
       }
-    }
 
-    // Sway animation
-    if (currentAnimation === 'sway_hips') {
-      if (groupRef.current) {
-        groupRef.current.rotation.z = Math.sin(timeRef.current * 1.2) * 0.1;
-        groupRef.current.position.x = Math.sin(timeRef.current * 1.2) * 0.1;
-      }
-    }
-  });
+      animationId = requestAnimationFrame(animate);
+    };
+
+    animationId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationId);
+  }, [targetState, currentAnimation]);
 
   return (
     <group ref={groupRef}>

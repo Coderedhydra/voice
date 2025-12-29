@@ -2,6 +2,17 @@
 const nextConfig = {
   reactCompiler: true,
   
+  // Turbopack configuration (Next.js 16+)
+  turbopack: {
+    resolveAlias: {
+      // Fix for React Three Fiber compatibility
+      fs: false,
+      path: false,
+      crypto: false,
+    },
+  },
+  
+  // Webpack configuration (fallback for --webpack flag)
   webpack: (config, { isServer }) => {
     // Fix for React Three Fiber compatibility
     if (!isServer) {

@@ -1,21 +1,8 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import * as THREE from 'three';
-
-// Dynamically import Canvas to avoid SSR issues - must not render on server
-const Canvas = dynamic(
-  () => import('@react-three/fiber').then(mod => ({ default: mod.Canvas })), 
-  { 
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-full flex items-center justify-center text-white">
-        <div>Loading 3D renderer...</div>
-      </div>
-    )
-  }
-);
 
 // Animation states mapping
 const animationStates = {
@@ -212,7 +199,7 @@ function Character({ animation, expression, intensity }) {
   );
 }
 
-// Scene component with drei components - dynamically imported
+// Scene component with drei components
 function Scene({ animation, expression, intensity }) {
   const [dreiLoaded, setDreiLoaded] = useState(false);
   const [dreiComponents, setDreiComponents] = useState(null);
@@ -227,12 +214,26 @@ function Scene({ animation, expression, intensity }) {
           Environment: drei.Environment,
         });
         setDreiLoaded(true);
+      }).catch((err) => {
+        console.error('Failed to load drei components:', err);
       });
     }
   }, []);
 
   if (!dreiLoaded || !dreiComponents) {
-    return null;
+    return (
+      <>
+        <ambientLight intensity={0.4} />
+        <directionalLight position={[5, 5, 5]} intensity={0.8} />
+        <pointLight position={[-5, 3, -5]} intensity={0.5} color="#ffb3d9" />
+        <pointLight position={[5, 3, -5]} intensity={0.5} color="#ff99cc" />
+        <Character
+          animation={animation?.body || 'idle_soft'}
+          expression={expression || animation?.face || 'smile_seductive'}
+          intensity={intensity || animation?.intensity || 0.5}
+        />
+      </>
+    );
   }
 
   const { OrbitControls, PerspectiveCamera, Environment } = dreiComponents;
@@ -267,6 +268,42 @@ function Scene({ animation, expression, intensity }) {
   );
 }
 
+// Canvas wrapper component - completely client-side
+function CanvasWrapper({ animation, expression, intensity }) {
+  const [CanvasComponent, setCanvasComponent] = useState(null);
+
+  useEffect(() => {
+    // Load Canvas only on client side
+    if (typeof window !== 'undefined') {
+      import('@react-three/fiber').then((mod) => {
+        setCanvasComponent(() => mod.Canvas);
+      }).catch((err) => {
+        console.error('Failed to load Canvas:', err);
+      });
+    }
+  }, []);
+
+  if (!CanvasComponent) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-white">
+        <div>Loading 3D renderer...</div>
+      </div>
+    );
+  }
+
+  return (
+    <CanvasComponent shadows>
+      <Suspense fallback={null}>
+        <Scene 
+          animation={animation}
+          expression={expression}
+          intensity={intensity}
+        />
+      </Suspense>
+    </CanvasComponent>
+  );
+}
+
 // Main renderer component
 export function CharacterRenderer({ animation, expression, intensity }) {
   const [mounted, setMounted] = useState(false);
@@ -275,16 +312,7 @@ export function CharacterRenderer({ animation, expression, intensity }) {
     setMounted(true);
   }, []);
 
-  if (!mounted || typeof window === 'undefined') {
-    return (
-      <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900 flex items-center justify-center">
-        <div className="text-white text-lg">Loading 3D renderer...</div>
-      </div>
-    );
-  }
-
-  // Ensure Canvas is loaded before rendering
-  if (!Canvas) {
+  if (!mounted) {
     return (
       <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900 flex items-center justify-center">
         <div className="text-white text-lg">Loading 3D renderer...</div>
@@ -294,13 +322,11 @@ export function CharacterRenderer({ animation, expression, intensity }) {
 
   return (
     <div className="w-full h-full bg-gradient-to-b from-purple-900 via-pink-900 to-purple-900">
-      <Canvas shadows>
-        <Scene 
-          animation={animation}
-          expression={expression}
-          intensity={intensity}
-        />
-      </Canvas>
+      <CanvasWrapper 
+        animation={animation}
+        expression={expression}
+        intensity={intensity}
+      />
     </div>
   );
 }

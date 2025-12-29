@@ -22,7 +22,7 @@ except ImportError:
     sys.exit(1)
 
 # Configuration
-WEBSOCKET_HOST = "0.0.0.0"  # Bind to all interfaces for WSL->Windows
+WEBSOCKET_HOST = "localhost"  # Bind to localhost only
 WEBSOCKET_PORT = 8765
 OLLAMA_MODEL = "llama3"  # Options: llama3, llama3.1, deepseek-r1
 SYSTEM_PROMPT_FILE = Path(__file__).parent / "waifu_system.txt"

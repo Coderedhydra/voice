@@ -78,11 +78,15 @@ ollama serve &
 # Pull the LLM model
 ollama pull llama3
 
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
 # Install Python dependencies
-pip3 install -r requirements.txt
+pip install -r requirements.txt
 
 # Start the WebSocket server
-python3 server.py
+python server.py
 ```
 
 ### 2. Setup Unity (Windows)
@@ -229,6 +233,22 @@ Edit `waifu_system.txt` to modify:
 - Safety boundaries
 
 ## Troubleshooting
+
+### "externally-managed-environment" error
+On modern Debian/Ubuntu systems, you must use a virtual environment:
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate it
+source venv/bin/activate
+
+# Now install packages
+pip install -r requirements.txt
+```
+
+The `run.sh` script handles this automatically.
 
 ### "Connection refused" in Unity
 - Make sure the Python server is running in WSL

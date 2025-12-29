@@ -27,7 +27,7 @@ except ImportError:
 WEBSOCKET_HOST = "localhost"  # Bind to localhost only
 WEBSOCKET_PORT = 8765
 # Default model - can be overridden via environment variable
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:4b")  # Options: qwen2.5:4b, qwen3:4b, llama3, llama3.1
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "dolphin-phi:2.7b")  # Options: dolphin-phi:2.7b, qwen2.5:4b, qwen3:4b, llama3
 SYSTEM_PROMPT_FILE = Path(__file__).parent / "waifu_system.txt"
 
 # Global state

@@ -8,7 +8,7 @@ export default function WaifuPage() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [currentAnimation, setCurrentAnimation] = useState(null);
-  const [model, setModel] = useState('qwen2.5:4b');
+  const [model, setModel] = useState('dolphin-phi:2.7b');
   const messagesEndRef = useRef(null);
   
   const { isConnected, lastMessage, error, sendMessage, reconnect } = useWebSocket(
@@ -77,10 +77,10 @@ export default function WaifuPage() {
               className="bg-black/50 text-white px-3 py-2 rounded-lg border border-pink-500/30 focus:outline-none focus:ring-2 focus:ring-pink-500"
               disabled={!isConnected}
             >
+              <option value="dolphin-phi:2.7b">Dolphin-Phi:2.7b</option>
               <option value="qwen2.5:4b">Qwen2.5:4b</option>
               <option value="qwen3:4b">Qwen3:4b</option>
               <option value="llama3">Llama3</option>
-              <option value="llama3.1">Llama3.1</option>
             </select>
             {!isConnected && (
               <button

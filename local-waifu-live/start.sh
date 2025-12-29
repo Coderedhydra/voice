@@ -54,7 +54,7 @@ echo -e "${GREEN}[✓] Cleanup complete${NC}"
 echo ""
 
 # Check if model is set
-MODEL="${OLLAMA_MODEL:-qwen3:4b}"
+MODEL="${OLLAMA_MODEL:-dolphin-phi:2.7b}"
 echo -e "${YELLOW}[*] Using model: $MODEL${NC}"
 echo ""
 

@@ -1,30 +1,33 @@
 #!/usr/bin/env python3
 """
 Local Waifu Live - WebSocket Server
-Connects Ollama LLM to Unity 3D renderer via WebSocket
-Runs on Ubuntu WSL, communicates with Unity on Windows host
+Connects Ollama LLM to Web renderer via WebSocket
+Uses Ollama HTTP API for faster responses
 """
 
 import asyncio
 import json
-import subprocess
+import os
 import re
 import signal
 import sys
+import requests
 from pathlib import Path
 from typing import Optional, Tuple
 
 try:
     import websockets
     from websockets.server import serve
+    from websockets.exceptions import ConnectionClosed, ConnectionClosedError, InvalidHandshake
 except ImportError:
     print("ERROR: websockets not installed. Run: pip install websockets")
     sys.exit(1)
 
 # Configuration
-WEBSOCKET_HOST = "localhost"  # Bind to localhost only
+WEBSOCKET_HOST = "localhost"
 WEBSOCKET_PORT = 8765
-OLLAMA_MODEL = "llama3"  # Options: llama3, llama3.1, deepseek-r1
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "dolphin-phi:2.7b")
+OLLAMA_API_URL = "http://localhost:11434/api/generate"
 SYSTEM_PROMPT_FILE = Path(__file__).parent / "waifu_system.txt"
 
 # Global state
@@ -43,67 +46,90 @@ def load_system_prompt() -> str:
 
 
 def check_ollama_available() -> bool:
-    """Check if Ollama is installed and running."""
+    """Check if Ollama API is available."""
     try:
-        result = subprocess.run(
-            ["ollama", "list"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+        response = requests.get("http://localhost:11434/api/tags", timeout=2)
+        return response.status_code == 200
+    except Exception:
         return False
 
 
 def check_model_available(model: str) -> bool:
     """Check if the specified model is available in Ollama."""
     try:
-        result = subprocess.run(
-            ["ollama", "list"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        return model in result.stdout
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        if response.status_code == 200:
+            models = response.json().get("models", [])
+            return any(m.get("name", "").startswith(model) for m in models)
+        return False
+    except Exception:
         return False
 
 
-def query_ollama(user_message: str, history: list) -> str:
-    """Query Ollama with the user message and conversation history."""
+def query_ollama_fast(user_message: str, history: list) -> str:
+    """Query Ollama using HTTP API for faster responses - optimized for speed."""
     global system_prompt
     
-    # Build the full prompt with history
-    full_prompt = f"System: {system_prompt}\n\n"
+    # Build messages array for API - shorter for speed
+    messages = []
     
-    # Add conversation history (last 10 exchanges)
-    for exchange in history[-10:]:
-        full_prompt += f"User: {exchange['user']}\nYuki: {exchange['assistant']}\n\n"
+    # Add system prompt (shortened version for speed)
+    system_msg = system_prompt[:500] if len(system_prompt) > 500 else system_prompt
+    messages.append({
+        "role": "system",
+        "content": system_msg
+    })
     
-    # Add current user message
-    full_prompt += f"User: {user_message}\nYuki:"
+    # Add conversation history (last 5 exchanges for maximum speed)
+    for exchange in history[-5:]:
+        # Truncate long messages
+        user_msg = exchange['user'][:100] if len(exchange['user']) > 100 else exchange['user']
+        assistant_msg = exchange['assistant'][:150] if len(exchange['assistant']) > 150 else exchange['assistant']
+        messages.append({"role": "user", "content": user_msg})
+        messages.append({"role": "assistant", "content": assistant_msg})
+    
+    # Add current user message (truncated)
+    user_msg = user_message[:150] if len(user_message) > 150 else user_message
+    messages.append({"role": "user", "content": user_msg})
     
     try:
-        # Run Ollama with the prompt
-        result = subprocess.run(
-            ["ollama", "run", OLLAMA_MODEL, full_prompt],
-            capture_output=True,
-            text=True,
-            timeout=120  # 2 minute timeout for slow models
+        # Optimized for speed - shorter responses, faster generation
+        payload = {
+            "model": OLLAMA_MODEL,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": 0.7,  # Lower for faster, more consistent
+                "top_p": 0.85,
+                "top_k": 20,  # Limit choices for speed
+                "num_predict": 100,  # Shorter responses = faster
+                "repeat_penalty": 1.1,
+                "num_ctx": 1024,  # Smaller context = faster
+            }
+        }
+        
+        response = requests.post(
+            OLLAMA_API_URL,
+            json=payload,
+            timeout=15  # Shorter timeout for faster failure detection
         )
         
-        if result.returncode == 0:
-            return result.stdout.strip()
+        if response.status_code == 200:
+            result = response.json()
+            response_text = result.get("response", "").strip()
+            # Quick response if empty
+            if not response_text:
+                return generate_fallback_response()
+            return response_text
         else:
-            print(f"Ollama error: {result.stderr}")
+            print(f"Ollama API error: {response.status_code} - {response.text[:100]}")
             return generate_fallback_response()
             
-    except subprocess.TimeoutExpired:
-        print("Ollama query timed out")
+    except requests.exceptions.Timeout:
+        print("Ollama API request timed out - using fallback")
         return generate_fallback_response()
     except Exception as e:
-        print(f"Ollama query failed: {e}")
+        print(f"Ollama API request failed: {e}")
         return generate_fallback_response()
 
 
@@ -176,11 +202,11 @@ def validate_animation(animation: dict) -> dict:
     valid_body = [
         "idle_soft", "lean_forward", "sway_hips", 
         "teasing_pose", "close_intimate_pose", 
-        "slow_breathing", "shy_cover"
+        "slow_breathing", "shy_cover", "seductive_dance", "bounce_chest"
     ]
     valid_face = [
         "smile_seductive", "blush_light", "blush_heavy",
-        "half_lidded_eyes", "soft_moan", "look_away"
+        "half_lidded_eyes", "soft_moan", "look_away", "wink_seductive"
     ]
     
     # Validate and fix body animation
@@ -219,12 +245,12 @@ def process_response(response: str) -> Tuple[dict, str]:
     return animation, chat_text
 
 
-async def handle_client(websocket):
-    """Handle a connected Unity client."""
+async def handle_client(websocket, path):
+    """Handle a connected WebSocket client."""
     global conversation_history
     
     client_address = websocket.remote_address
-    print(f"[+] Unity client connected: {client_address}")
+    print(f"[+] WebSocket client connected: {client_address} (path: {path})")
     connected_clients.add(websocket)
     
     # Send welcome message
@@ -247,6 +273,10 @@ async def handle_client(websocket):
     
     try:
         async for message in websocket:
+            # Handle both string and bytes messages
+            if isinstance(message, bytes):
+                message = message.decode('utf-8')
+            
             print(f"[<] Received: {message[:100]}...")
             
             try:
@@ -258,13 +288,15 @@ async def handle_client(websocket):
             if not user_input:
                 continue
             
-            print(f"[?] Querying Ollama: {user_input[:50]}...")
+            print(f"[?] Querying Ollama API with model '{OLLAMA_MODEL}': {user_input[:50]}...")
             
-            # Query Ollama
-            response = query_ollama(user_input, conversation_history)
+            # Query Ollama using fast API
+            response = query_ollama_fast(user_input, conversation_history)
+            print(f"[+] Ollama response received: {response[:100]}...")
             
             # Process response
             animation, chat_text = process_response(response)
+            print(f"[+] Processed - Animation: {animation['body']}/{animation['face']}, Chat: {chat_text[:50]}...")
             
             # Store in history
             conversation_history.append({
@@ -272,9 +304,9 @@ async def handle_client(websocket):
                 "assistant": chat_text
             })
             
-            # Keep history manageable
-            if len(conversation_history) > 50:
-                conversation_history = conversation_history[-30:]
+            # Keep history manageable (shorter for speed)
+            if len(conversation_history) > 30:
+                conversation_history = conversation_history[-20:]
             
             # Build response payload
             payload = {
@@ -288,10 +320,14 @@ async def handle_client(websocket):
             # Send to client
             await websocket.send(json.dumps(payload))
             
-    except websockets.exceptions.ConnectionClosed:
+    except ConnectionClosed:
         print(f"[-] Client disconnected: {client_address}")
+    except ConnectionClosedError:
+        print(f"[-] Client connection closed: {client_address}")
     except Exception as e:
         print(f"[!] Error handling client: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         connected_clients.discard(websocket)
 
@@ -310,19 +346,20 @@ async def main():
     global system_prompt
     
     print("=" * 60)
-    print("  LOCAL WAIFU LIVE - WebSocket Server")
+    print("  LOCAL WAIFU LIVE - WebSocket Server (Fast API Mode)")
     print("=" * 60)
     
     # Load system prompt
     system_prompt = load_system_prompt()
     print(f"[✓] Loaded system prompt ({len(system_prompt)} chars)")
     
-    # Check Ollama
+    # Check Ollama API
     if not check_ollama_available():
-        print("[!] WARNING: Ollama not available. Install with: curl -fsSL https://ollama.ai/install.sh | sh")
+        print("[!] WARNING: Ollama API not available at http://localhost:11434")
+        print("[!] Make sure Ollama is running: ollama serve")
         print("[!] Continuing anyway - will use fallback responses")
     else:
-        print(f"[✓] Ollama available")
+        print(f"[✓] Ollama API available")
         
         if not check_model_available(OLLAMA_MODEL):
             print(f"[!] Model '{OLLAMA_MODEL}' not found. Pull with: ollama pull {OLLAMA_MODEL}")
@@ -330,7 +367,7 @@ async def main():
             print(f"[✓] Model '{OLLAMA_MODEL}' ready")
     
     print(f"[*] Starting WebSocket server on ws://{WEBSOCKET_HOST}:{WEBSOCKET_PORT}")
-    print("[*] Waiting for Unity client connection...")
+    print("[*] Waiting for WebSocket client connection...")
     print("-" * 60)
     
     # Handle graceful shutdown
@@ -344,7 +381,18 @@ async def main():
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, signal_handler)
     
-    async with serve(handle_client, WEBSOCKET_HOST, WEBSOCKET_PORT):
+    # Create WebSocket server
+    async with serve(
+        handle_client,
+        WEBSOCKET_HOST,
+        WEBSOCKET_PORT,
+        ping_interval=20,
+        ping_timeout=10,
+        close_timeout=10,
+        max_size=2**20,
+        origins=None,
+    ):
+        print(f"[✓] WebSocket server running on ws://{WEBSOCKET_HOST}:{WEBSOCKET_PORT}")
         await stop.wait()
     
     print("[*] Server stopped")
@@ -357,4 +405,6 @@ if __name__ == "__main__":
         print("\n[*] Interrupted")
     except Exception as e:
         print(f"[!] Fatal error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)

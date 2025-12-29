@@ -54,7 +54,10 @@ pip install --upgrade pip -q
 
 # Install Python dependencies in virtual environment
 echo -e "${YELLOW}[*] Installing Python dependencies...${NC}"
+pip install -q --upgrade pip
 pip install -q -r requirements.txt
+# Ensure requests is installed
+pip install -q requests>=2.31.0
 echo -e "${GREEN}[✓] Dependencies installed${NC}"
 
 # Check Ollama
@@ -67,13 +70,13 @@ echo -e "${GREEN}[✓] Ollama installed${NC}"
 # Start Ollama server in background if not running
 if ! pgrep -x "ollama" > /dev/null; then
     echo -e "${YELLOW}[*] Starting Ollama server...${NC}"
-    ollama serve &
+    ollama serve > /dev/null 2>&1 &
     sleep 3
 fi
 echo -e "${GREEN}[✓] Ollama server running${NC}"
 
-# Check for model
-MODEL="llama3"
+# Check for model (use environment variable or default)
+MODEL="${OLLAMA_MODEL:-dolphin-phi:2.7b}"
 if ! ollama list | grep -q "$MODEL"; then
     echo -e "${YELLOW}[!] Model '$MODEL' not found. Pulling...${NC}"
     ollama pull "$MODEL"
@@ -83,9 +86,28 @@ echo -e "${GREEN}[✓] Model '$MODEL' ready${NC}"
 echo ""
 echo "========================================"
 echo "  Starting WebSocket Server"
-echo "  Connect Unity to: ws://localhost:8765"
+echo "  Connect Web Client to: ws://localhost:8765"
+echo "  Model: $MODEL"
 echo "========================================"
 echo ""
+
+# Kill any existing server on port 8765
+if command -v lsof > /dev/null; then
+    PID=$(lsof -ti:8765 2>/dev/null || true)
+    if [ ! -z "$PID" ]; then
+        echo -e "${YELLOW}[*] Killing existing process on port 8765 (PID: $PID)...${NC}"
+        kill -9 $PID 2>/dev/null || true
+        sleep 2
+    fi
+elif command -v fuser > /dev/null; then
+    echo -e "${YELLOW}[*] Killing existing process on port 8765...${NC}"
+    fuser -k 8765/tcp 2>/dev/null || true
+    sleep 2
+fi
+
+# Also kill any Python server processes
+pkill -f "python.*server.py" 2>/dev/null || true
+sleep 1
 
 # Run the server using the virtual environment's Python
 python server.py

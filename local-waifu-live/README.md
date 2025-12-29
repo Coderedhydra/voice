@@ -1,32 +1,24 @@
-# Local Waifu Live
+# Local Waifu Live - Web Edition
 
-A live-rendered adult anime-style 3D waifu that chats with you using a local Ollama LLM and displays real-time animations in Unity.
+A live-rendered adult anime-style 3D waifu that chats with you using a local Ollama LLM and displays real-time animations in a web browser using Three.js/WebGL.
 
-**Runs entirely offline on localhost. No cloud services, no external APIs.**
+**Runs entirely offline on localhost. No cloud services, no external APIs. Works on Ubuntu/Linux.**
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Windows Host                           │
+│                      Ubuntu Host                            │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │                    Unity 3D                          │   │
+│  │              Next.js Web App (Port 3000)            │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
-│  │  │  Animator   │  │ Blendshapes │  │   Chat UI   │  │   │
-│  │  │  (Body)     │  │   (Face)    │  │             │  │   │
+│  │  │ Three.js    │  │  WebSocket  │  │   Chat UI   │  │   │
+│  │  │ Renderer    │  │   Client    │  │             │  │   │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  │   │
-│  │                         ▲                            │   │
-│  │                         │                            │   │
-│  │              ┌──────────┴──────────┐                 │   │
-│  │              │  WebSocketClient.cs │                 │   │
-│  │              └──────────┬──────────┘                 │   │
-│  └─────────────────────────┼───────────────────────────┘   │
+│  └─────────────────────────┬───────────────────────────┘   │
 │                            │                                │
 │                   ws://localhost:8765                       │
 │                            │                                │
-├────────────────────────────┼────────────────────────────────┤
-│                            │                                │
-│                      Ubuntu WSL                             │
 │  ┌─────────────────────────┴───────────────────────────┐   │
 │  │                   server.py                          │   │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │   │
@@ -37,80 +29,118 @@ A live-rendered adult anime-style 3D waifu that chats with you using a local Oll
 │                             │                               │
 │                    ┌────────┴────────┐                      │
 │                    │     Ollama      │                      │
-│                    │   (llama3)      │                      │
+│                    │ (qwen2.5:4b,    │                      │
+│                    │  qwen3:4b, etc) │                      │
 │                    └─────────────────┘                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ## Requirements
 
-### Ubuntu WSL
+### Ubuntu/Linux
 - Python 3.8+
 - pip3
+- Node.js 18+ and npm
 - Ollama
-
-### Windows Host
-- Unity 2021.3+ (LTS recommended)
-- NativeWebSocket package
-- 3D anime character with Animator + blendshapes
+- Modern web browser with WebGL support
 
 ## Quick Start
 
-### 1. Setup WSL (Ubuntu)
+### 1. Install Ollama
 
 ```bash
-# Navigate to the wsl folder
+curl -fsSL https://ollama.ai/install.sh | sh
+```
+
+### 2. Pull a Model
+
+Choose one of these models (recommended for Ubuntu):
+
+```bash
+# Qwen models (good performance, smaller size)
+ollama pull qwen2.5:4b
+# or
+ollama pull qwen3:4b
+
+# Alternative: Llama models
+ollama pull llama3
+# or
+ollama pull llama3.1
+```
+
+### 3. Setup Python Server
+
+```bash
 cd local-waifu-live/wsl
 
-# Run the setup and server script
+# Run the setup script (creates venv, installs dependencies)
 ./run.sh
 ```
 
 Or manually:
 
 ```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
+cd local-waifu-live/wsl
 
-# Start Ollama server
-ollama serve &
-
-# Pull the LLM model
-ollama pull llama3
-
-# Create and activate virtual environment
+# Create virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# Install Python dependencies
+# Install dependencies
 pip install -r requirements.txt
+
+# Set model (optional, defaults to qwen2.5:4b)
+export OLLAMA_MODEL=qwen3:4b
 
 # Start the WebSocket server
 python server.py
 ```
 
-### 2. Setup Unity (Windows)
+The server will run on `ws://localhost:8765`
 
-1. **Install NativeWebSocket**:
-   - Open Unity Package Manager (Window > Package Manager)
-   - Click `+` > "Add package from git URL"
-   - Enter: `https://github.com/endel/NativeWebSocket.git#upm`
+### 4. Setup Next.js Web App
 
-2. **Import WebSocketClient.cs**:
-   - Copy `unity/WebSocketClient.cs` to your Unity project's Scripts folder
+In a new terminal:
 
-3. **Setup your character**:
-   - Add an Animator component with the required animation states
-   - Add a SkinnedMeshRenderer with blendshapes for facial expressions
-   - Attach the `WebSocketClient` script to your character
+```bash
+# Install Node.js dependencies
+npm install
 
-4. **Configure the Inspector**:
-   - Assign the Animator reference
-   - Assign the SkinnedMeshRenderer (face mesh)
-   - Setup your Chat UI (TextMeshPro)
-   - Setup your Input Field (TMP_InputField)
+# Start the development server
+npm run dev
+```
 
-5. **Press Play**!
+The web app will be available at `http://localhost:3000/waifu`
+
+### 5. Open in Browser
+
+Navigate to `http://localhost:3000/waifu` and start chatting!
+
+## Changing the LLM Model
+
+### Option 1: Environment Variable
+
+```bash
+export OLLAMA_MODEL=qwen3:4b
+python server.py
+```
+
+### Option 2: Edit server.py
+
+Edit `local-waifu-live/wsl/server.py`:
+
+```python
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:4b")
+```
+
+Then pull the model:
+```bash
+ollama pull qwen3:4b
+```
+
+### Option 3: Use the UI
+
+The web interface has a dropdown to select models (requires server restart with new model).
 
 ## Animation Commands
 
@@ -137,7 +167,7 @@ python server.py
 
 ## JSON Protocol
 
-### Server → Unity
+### Server → Web Client
 ```json
 {
   "animation": {
@@ -151,77 +181,11 @@ python server.py
 }
 ```
 
-### Unity → Server
+### Web Client → Server
 ```json
 {
   "message": "Hey Yuki, you look beautiful"
 }
-```
-
-## Unity Animator Setup
-
-Create an Animator Controller with these states:
-
-```
-Entry → idle_soft (default)
-         ↓ (trigger)
-    ┌────┴────┐
-    │         │
-lean_forward  sway_hips
-    │         │
-    └────┬────┘
-         ↓
-   teasing_pose
-         ↓
-close_intimate_pose
-         ↓
-  slow_breathing
-         ↓
-    shy_cover
-```
-
-Add trigger parameters for each animation:
-- `idle_soft`
-- `lean_forward`
-- `sway_hips`
-- `teasing_pose`
-- `close_intimate_pose`
-- `slow_breathing`
-- `shy_cover`
-
-Add float parameter:
-- `Intensity` (0.0 - 1.0)
-
-## Blendshape Setup
-
-Your character mesh should have these blendshapes (or map your existing ones in the script):
-
-- `Mouth_Smile`
-- `Eyes_Happy`
-- `Cheek_Blush`
-- `Face_Embarrassed`
-- `Eyes_HalfClosed`
-- `Eyes_Bedroom`
-- `Mouth_Open`
-- `Eyes_Pleasure`
-- `Eyes_LookAway`
-- `Head_TurnAway`
-
-Edit the `expressionBlendShapes` dictionary in `WebSocketClient.cs` to match your character's blendshape names.
-
-## Changing the LLM Model
-
-Edit `server.py` and change the `OLLAMA_MODEL` variable:
-
-```python
-OLLAMA_MODEL = "llama3"     # Default
-# OLLAMA_MODEL = "llama3.1"   # Alternative
-# OLLAMA_MODEL = "deepseek-r1" # Alternative
-```
-
-Then pull the model:
-```bash
-ollama pull <model_name>
 ```
 
 ## Customizing Yuki's Personality
@@ -238,22 +202,18 @@ Edit `waifu_system.txt` to modify:
 On modern Debian/Ubuntu systems, you must use a virtual environment:
 
 ```bash
-# Create virtual environment
+cd local-waifu-live/wsl
 python3 -m venv venv
-
-# Activate it
 source venv/bin/activate
-
-# Now install packages
 pip install -r requirements.txt
 ```
 
 The `run.sh` script handles this automatically.
 
-### "Connection refused" in Unity
-- Make sure the Python server is running in WSL
-- Check that port 8765 is not blocked by firewall
-- Try using `127.0.0.1` instead of `localhost` in Unity
+### "Connection refused" in browser
+- Make sure the Python server is running: `python server.py`
+- Check that port 8765 is not blocked: `netstat -tuln | grep 8765`
+- Check browser console for WebSocket errors
 
 ### Ollama not responding
 ```bash
@@ -271,13 +231,23 @@ ollama serve &
 ollama list
 
 # Pull the required model
-ollama pull llama3
+ollama pull qwen2.5:4b
 ```
 
+### Web app not loading
+- Make sure Node.js dependencies are installed: `npm install`
+- Check if port 3000 is available: `lsof -i :3000`
+- Check browser console for errors
+
 ### Slow responses
-- Use a smaller model (llama3 8B vs 70B)
+- Use a smaller model (qwen2.5:4b or qwen3:4b)
 - Increase system RAM
-- Consider GPU acceleration for Ollama
+- Consider GPU acceleration for Ollama (if you have NVIDIA GPU)
+
+### Three.js/WebGL not working
+- Check browser WebGL support: https://get.webgl.org/
+- Update your browser to the latest version
+- Try a different browser (Chrome, Firefox, Edge)
 
 ## File Structure
 
@@ -289,8 +259,42 @@ local-waifu-live/
 │   ├── waifu_system.txt   # LLM system prompt
 │   ├── requirements.txt   # Python dependencies
 │   └── run.sh             # Startup script
-└── unity/
-    └── WebSocketClient.cs # Unity C# client
+app/
+└── waifu/
+    ├── page.jsx           # Main React page
+    ├── hooks/
+    │   └── useWebSocket.js # WebSocket client hook
+    └── components/
+        └── CharacterRenderer.jsx # Three.js renderer
+```
+
+## Running Both Servers
+
+You'll need two terminal windows:
+
+**Terminal 1 - Python WebSocket Server:**
+```bash
+cd local-waifu-live/wsl
+./run.sh
+```
+
+**Terminal 2 - Next.js Web Server:**
+```bash
+npm run dev
+```
+
+Then open `http://localhost:3000/waifu` in your browser.
+
+## Production Build
+
+To build for production:
+
+```bash
+# Build Next.js app
+npm run build
+
+# Start production server
+npm start
 ```
 
 ## License

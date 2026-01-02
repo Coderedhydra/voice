@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
+import { AnimeCharacter } from './AnimeCharacter';
 
 // Animation states mapping - MILF seductive movements
 const animationStates = {
@@ -616,9 +617,10 @@ function Character2D({ animation, expression, intensity }) {
   );
 }
 
-// Main renderer component
+// Main renderer component - Now uses actual anime character images!
 export function CharacterRenderer({ animation, expression, intensity }) {
   const [mounted, setMounted] = useState(false);
+  const [useCanvas, setUseCanvas] = useState(false); // Toggle between image and canvas
 
   useEffect(() => {
     setMounted(true);
@@ -641,13 +643,29 @@ export function CharacterRenderer({ animation, expression, intensity }) {
         <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-red-500 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }}></div>
       </div>
       
-      {/* MILF Character */}
-      <div className="relative z-10">
-        <Character2D
-          animation={animation}
-          expression={expression}
-          intensity={intensity}
-        />
+      {/* Toggle button */}
+      <button
+        onClick={() => setUseCanvas(!useCanvas)}
+        className="absolute top-4 right-4 z-20 bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+      >
+        {useCanvas ? 'Use Images' : 'Use Canvas'}
+      </button>
+      
+      {/* Character - Image-based (NEW!) or Canvas (OLD) */}
+      <div className="relative z-10 w-full h-full">
+        {useCanvas ? (
+          <Character2D
+            animation={animation}
+            expression={expression}
+            intensity={intensity}
+          />
+        ) : (
+          <AnimeCharacter
+            animation={animation}
+            expression={expression}
+            intensity={intensity}
+          />
+        )}
       </div>
     </div>
   );

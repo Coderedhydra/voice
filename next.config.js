@@ -2,19 +2,8 @@
 const nextConfig = {
   reactCompiler: true,
   
-  // Webpack configuration for React Three Fiber compatibility
-  webpack: (config, { isServer }) => {
-    // Fix for React Three Fiber compatibility
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        path: false,
-        crypto: false,
-      };
-    }
-    return config;
-  },
+  // Empty turbopack config to satisfy Next.js 16 requirements
+  turbopack: {},
   
   redirects() {
     return [

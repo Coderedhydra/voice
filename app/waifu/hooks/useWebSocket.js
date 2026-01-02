@@ -30,7 +30,9 @@ export function useWebSocket(url) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          setLastMessage(data);
+          console.log('[WebSocket] Message received:', data);
+          // Create a new object with timestamp to force re-render
+          setLastMessage({ ...data, _timestamp: Date.now() });
         } catch (e) {
           console.error('Failed to parse WebSocket message:', e);
         }

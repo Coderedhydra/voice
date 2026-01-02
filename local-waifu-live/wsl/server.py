@@ -111,7 +111,7 @@ def query_ollama_fast(user_message: str, history: list) -> str:
         response = requests.post(
             OLLAMA_API_URL,
             json=payload,
-            timeout=15  # Shorter timeout for faster failure detection
+            timeout=60  # Increased timeout for model loading
         )
         
         if response.status_code == 200:
@@ -119,17 +119,28 @@ def query_ollama_fast(user_message: str, history: list) -> str:
             response_text = result.get("response", "").strip()
             # Quick response if empty
             if not response_text:
+                print(f"[!] Empty response from Ollama")
                 return generate_fallback_response()
+            print(f"[✓] Ollama response length: {len(response_text)} chars")
             return response_text
         else:
-            print(f"Ollama API error: {response.status_code} - {response.text[:100]}")
+            print(f"[!] Ollama API error: {response.status_code}")
+            print(f"[!] Response text: {response.text[:200]}")
             return generate_fallback_response()
             
     except requests.exceptions.Timeout:
-        print("Ollama API request timed out - using fallback")
+        print("[!] Ollama API request timed out (60s)")
+        print("[!] This usually means:")
+        print("    1. Ollama is not running (run: ollama serve)")
+        print("    2. Model is not loaded (run: ollama pull dolphin-phi:2.7b)")
+        print("    3. System is too slow/overloaded")
+        return generate_fallback_response()
+    except requests.exceptions.ConnectionError as e:
+        print(f"[!] Cannot connect to Ollama at {OLLAMA_API_URL}")
+        print("[!] Make sure Ollama is running: ollama serve")
         return generate_fallback_response()
     except Exception as e:
-        print(f"Ollama API request failed: {e}")
+        print(f"[!] Ollama API request failed: {type(e).__name__}: {e}")
         return generate_fallback_response()
 
 

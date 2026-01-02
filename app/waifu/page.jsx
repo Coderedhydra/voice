@@ -23,17 +23,25 @@ export default function WaifuPage() {
   // Handle incoming WebSocket messages
   useEffect(() => {
     if (lastMessage) {
-      console.log('Received WebSocket message:', lastMessage);
+      console.log('[Page] Received WebSocket message:', lastMessage);
       if (lastMessage.animation) {
-        console.log('Setting animation:', lastMessage.animation);
+        console.log('[Page] Setting animation:', lastMessage.animation);
         setCurrentAnimation(lastMessage.animation);
       }
       if (lastMessage.chat) {
-        console.log('Adding chat message:', lastMessage.chat);
-        setMessages((prev) => [
-          ...prev,
-          { type: 'assistant', content: lastMessage.chat, timestamp: Date.now() },
-        ]);
+        console.log('[Page] Adding chat message:', lastMessage.chat);
+        setMessages((prev) => {
+          // Avoid duplicate messages by checking the last message
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg && lastMsg.type === 'assistant' && lastMsg.content === lastMessage.chat) {
+            console.log('[Page] Duplicate message, skipping');
+            return prev;
+          }
+          return [
+            ...prev,
+            { type: 'assistant', content: lastMessage.chat, timestamp: lastMessage._timestamp || Date.now() },
+          ];
+        });
       }
     }
   }, [lastMessage]);

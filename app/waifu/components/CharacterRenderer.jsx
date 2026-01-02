@@ -31,7 +31,7 @@ function Character2D({ animation, expression, intensity }) {
   const canvasRef = useRef(null);
   const animationFrameRef = useRef(null);
   const timeRef = useRef(0);
-  const [currentState, setCurrentState] = useState({
+  const currentStateRef = useRef({
     animation: 'idle_soft',
     expression: 'smile_seductive',
     intensity: 0.5,
@@ -39,11 +39,11 @@ function Character2D({ animation, expression, intensity }) {
 
   useEffect(() => {
     if (animation) {
-      setCurrentState({
+      currentStateRef.current = {
         animation: animation.body || 'idle_soft',
         expression: animation.face || expression || 'smile_seductive',
         intensity: animation.intensity || intensity || 0.5,
-      });
+      };
     }
   }, [animation, expression, intensity]);
 
@@ -59,6 +59,7 @@ function Character2D({ animation, expression, intensity }) {
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      const currentState = currentStateRef.current;
       const animState = animationStates[currentState.animation] || animationStates.idle_soft;
       const exprColors = expressionColors[currentState.expression] || expressionColors.smile_seductive;
       
@@ -292,7 +293,7 @@ function Character2D({ animation, expression, intensity }) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [currentState]);
+  }, []); // Empty dependency array - animation loop runs continuously
 
   return (
     <canvas
